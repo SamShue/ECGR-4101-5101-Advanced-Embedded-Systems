@@ -1,8 +1,8 @@
 <div id="dp-wrapper" class="dp-wrapper">
     <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
         <h2><span style="color: #004b87;">Objective</span></h2>
-        <p>In this lab, you will build a complete STM32 embedded development environment from scratch on your laptop, then hand-assemble a bare HAL/CMSIS firmware project for the <strong>NUCLEO-L496ZG-P</strong> development board <strong>without using STM32CubeMX's graphical Pinout/Project-Generator interface</strong>. You will install the <strong>STM32CubeIDE for VS Code</strong> extension pack, which brings a full C/C++ editing, build, flash, and debug experience directly into Visual Studio Code, and its built-in Bundle Manager will automatically download the ARM compiler, debugger, and programmer the first time your project needs them. You will obtain ST's official CMSIS and HAL driver source directly from the STM32CubeL4 firmware package, wire together your own <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>, linker script, and startup file, and write every peripheral initialization call &mdash; clocks, GPIO, and UART &mdash; yourself in <code style="font-family: monospace; color: #273540;">main.c</code> by reading the HAL header files directly. You will then write a simple verification program that blinks an LED and streams data over a UART serial connection, and confirm end-to-end operation by observing both the physical LED and a serial terminal on your laptop.</p>
-        <p>By the end of this lab you will be able to: assemble a bare-metal STM32 project directly from ST's CMSIS and HAL source libraries (no code generator involved), write clock, GPIO, and UART initialization code by hand using the HAL API, build and flash firmware entirely within VS Code, and interpret live serial output from the target board.</p>
+        <p>In this lab, you will build the complete STM32 embedded development environment from scratch on your laptop. You will install STMicroelectronics' official code-generation tool (STM32CubeMX) and the <strong>STM32CubeIDE for VS Code</strong> extension pack, which brings a full C/C++ editing, build, flash, and debug experience directly into Visual Studio Code. Unlike older versions of this tooling, you do <strong>not</strong> need to separately install a command-line tools package &mdash; the extension's built-in Bundle Manager automatically downloads the ARM compiler, debugger, and programmer the first time your project needs them. Using these tools, you will generate a HAL-based firmware project for the <strong>NUCLEO-L496ZG-P</strong> development board, write a simple verification program that blinks an LED and streams data over a UART serial connection, and confirm end-to-end operation by observing both the physical LED and a serial terminal on your laptop.</p>
+        <p>By the end of this lab you will be able to: create a new STM32 project from a board template in STM32CubeMX by accepting its default peripheral configuration (without manually configuring pins through the graphical Pinout view), generate a CMake-based project, build and flash firmware entirely within VS Code, and interpret live serial output from the target board.</p>
         <h2><span style="color: #004b87;">Required Materials</span></h2>
         <ul>
             <li>NUCLEO-L496ZG-P Development Board</li>
@@ -13,10 +13,10 @@
         <hr style="margin: 30px 0px; border: 1px solid #cccccc;" />
         <h2><span style="color: #004b87;">Background</span></h2>
         <h3>The STM32 Ecosystem</h3>
-        <p>STMicroelectronics produces one of the most widely used families of 32-bit microcontrollers in industry: the STM32 series. These devices are built on ARM Cortex-M cores and span an enormous range of performance and power profiles. ST normally encourages developers to use <strong>STM32CubeMX</strong>, a graphical tool that lets you select a board, drag-and-drop configure its pins and peripherals, and automatically generate a ready-to-compile project. <strong>This course intentionally skips that graphical configurator.</strong> Understanding what CubeMX generates on your behalf &mdash; clock trees, GPIO alternate-function mappings, HAL init sequences &mdash; is the entire point of an embedded systems course, so in this lab you will pull the same underlying CMSIS/HAL source libraries ST ships and wire a project together, and initialize every peripheral, by hand.</p>
+        <p>STMicroelectronics produces one of the most widely used families of 32-bit microcontrollers in industry: the STM32 series. These devices are built on ARM Cortex-M cores and span an enormous range of performance and power profiles. To help developers get up and running quickly, ST provides a tightly integrated software ecosystem consisting of two major components you will use throughout this course:</p>
         <ul>
-            <li><strong>STM32CubeMX</strong> &ndash; Used in this lab <em>only</em> as a package-download manager to fetch the STM32CubeL4 firmware package (CMSIS headers and HAL driver source) onto your machine. You will not create a project or touch its Pinout/Configuration GUI.</li>
-            <li><strong>STM32CubeIDE for VS Code</strong> &ndash; ST's official extension <em>pack</em> for Visual Studio Code, and the direct successor to the older &quot;STM32 VS Code Extension.&quot; It drives the CMake build and can flash or debug the board directly from the editor. Rather than requiring a separate STM32CubeCLT command-line tools installer, it includes a <strong>Bundle Manager</strong> that automatically downloads the exact ARM cross-compiler (<code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>), CMake, Ninja, and flashing/debugging tools your project needs, an ST-provided debug adapter for ST-LINK and J-Link probes, a <code style="font-family: monospace; color: #273540;">clangd</code>-based C/C++ editor, and a built-in serial terminal &mdash; all as one installable pack.</li>
+            <li><strong>STM32CubeMX</strong> &ndash; A graphical tool that lets you select a target device or development board, configure its pins and peripherals through a visual interface, set up clocks, and then automatically generate a ready-to-compile C project with all of the necessary initialization code already written for you.</li>
+            <li><strong>STM32CubeIDE for VS Code</strong> &ndash; ST's official extension <em>pack</em> for Visual Studio Code, and the direct successor to the older &quot;STM32 VS Code Extension.&quot; It auto-detects CubeMX project files, drives the CMake build, and can flash or debug the board directly from the editor. Rather than requiring a separate STM32CubeCLT command-line tools installer, it includes a <strong>Bundle Manager</strong> that automatically downloads the exact ARM cross-compiler (<code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>), CMake, Ninja, and flashing/debugging tools your project needs, an ST-provided debug adapter for ST-LINK and J-Link probes, a <code style="font-family: monospace; color: #273540;">clangd</code>-based C/C++ editor, and a built-in serial terminal &mdash; all as one installable pack.</li>
         </ul>
         <h3>The NUCLEO-L496ZG-P Development Board</h3>
         <p><img src="https://instructure.charlotte.edu/courses/271388/files/33825446/preview" alt="image.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/271388/files/33825446" data-api-returntype="File" /></p>
@@ -25,25 +25,18 @@
             <li><strong>Core:</strong> ARM Cortex-M4 with FPU, running up to 80 MHz.</li>
             <li><strong>Memory:</strong> 1 MB Flash, 320 KB SRAM.</li>
             <li><strong>On-board ST-LINK/V3E:</strong> An integrated programmer/debugger that connects to your laptop over a single Micro-USB cable. It appears on your PC as a virtual COM port (for serial output) and as a programmable debug interface (for flashing and stepping through code) &mdash; no external programmer is needed.</li>
-            <li><strong>User LEDs:</strong> Three user-controllable LEDs &mdash; <strong>LD1 (green, PC7)</strong>, <strong>LD2 (blue, PB7)</strong>, and <strong>LD3 (red, PB14)</strong> &mdash; each a simple push-pull GPIO output. You will configure these pins yourself.</li>
-            <li><strong>User Push-Button (B1):</strong> A tactile button connected to <strong>PC13</strong> with an external pull-up resistor.</li>
-            <li><strong>Virtual COM Port (VCP):</strong> <strong>USART3</strong> on <strong>PD8 (TX)</strong> / <strong>PD9 (RX)</strong>, alternate function <strong>AF7</strong>, is wired directly to the ST-LINK, so data you transmit with <code style="font-family: monospace; color: #273540;">HAL_UART_Transmit()</code> appears in a serial terminal on your laptop without any additional hardware.</li>
+            <li><strong>User LEDs:</strong> Three user-controllable LEDs &mdash; LD1 (green), LD2 (blue), and LD3 (red) &mdash; accessible through GPIO pins that CubeMX will name and configure for you.</li>
+            <li><strong>User Push-Button (B1):</strong> A tactile button connected to PC13 with an external pull-up resistor.</li>
+            <li><strong>Virtual COM Port (VCP):</strong> USART3 (pins PD8/PD9) is wired directly to the ST-LINK, so data you transmit with <code style="font-family: monospace; color: #273540;">HAL_UART_Transmit()</code> appears in a serial terminal on your laptop without any additional hardware.</li>
         </ul>
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0;"><strong>Board Orientation Note:</strong> The NUCLEO-L496ZG-P has two USB connectors. The <strong>Micro-USB port labeled "USB ST-LINK" (CN1)</strong> is the one used for programming and the virtual COM port. The second USB connector is for the STM32's own USB peripheral and is not used in this lab. Always plug the ST-LINK port into your laptop.</p>
         </div>
         <h3>Hardware Abstraction Layer (HAL)</h3>
-        <p>The STM32 HAL (Hardware Abstraction Layer) is a C library maintained by STMicroelectronics. It wraps every on-chip peripheral &mdash; GPIOs, UARTs, SPI buses, DMA controllers, timers, and more &mdash; behind a consistent, device-independent API. This means that code written with <code style="font-family: monospace; color: #273540;">HAL_GPIO_TogglePin()</code> will compile and behave correctly on an L496, an F4, an H7, or any other STM32 device with only minor project-level changes.</p>
-        <p>Normally CubeMX generates HAL initialization calls automatically based on a graphical peripheral configuration. In this lab you skip that step entirely: you will call <code style="font-family: monospace; color: #273540;">HAL_GPIO_Init()</code>, <code style="font-family: monospace; color: #273540;">HAL_UART_Init()</code>, and <code style="font-family: monospace; color: #273540;">HAL_RCC_OscConfig()</code> yourself directly in <code style="font-family: monospace; color: #273540;">main.c</code>, using the parameter values and macro names documented in each HAL header file (<code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.h</code>, <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_uart.h</code>, etc.). This is exactly the code CubeMX would have written for you &mdash; you are simply the one writing it.</p>
+        <p>The STM32 HAL (Hardware Abstraction Layer) is a C library generated and maintained by STMicroelectronics. It wraps every on-chip peripheral &mdash; GPIOs, UARTs, SPI buses, DMA controllers, timers, and more &mdash; behind a consistent, device-independent API. This means that code written with <code style="font-family: monospace; color: #273540;">HAL_GPIO_TogglePin()</code> will compile and behave correctly on an L496, an F4, an H7, or any other STM32 device with only minor project-level changes.</p>
+        <p>CubeMX generates the HAL initialization code automatically based on your peripheral configuration. Your job as the application developer is to call the HAL functions in the <strong>USER CODE</strong> sections of <code style="font-family: monospace; color: #273540;">main.c</code>. These specially marked sections are preserved every time you regenerate from CubeMX, so you never lose your application code when you change a peripheral setting.</p>
         <h3>CMake Build System</h3>
-        <p>CMake is an industry-standard, cross-platform build system generator. In this lab you will write your own <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> that describes your source files, include paths, compiler flags, and linker script. The STM32CubeIDE for VS Code extension pack (through its bundled Microsoft CMake Tools component) reads this file to drive the actual compilation with <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>, using the compiler that the extension's Bundle Manager downloads for you.</p>
-        <h3>Where the Library Source Comes From</h3>
-        <p>ST publishes the CMSIS device headers and HAL driver source for every STM32 family as the <strong>STM32CubeL4 firmware package</strong>. You will fetch this package once, using STM32CubeMX purely as a <em>download manager</em> (its <strong>Manage embedded software packages</strong> menu), and then copy the following pieces directly into your own hand-built project folder:</p>
-        <ul>
-            <li><strong>Drivers/CMSIS</strong> &mdash; ARM Cortex-M core headers and the STM32L4 device header/register definitions (<code style="font-family: monospace; color: #273540;">stm32l496xx.h</code>, etc.), plus the GCC startup assembly file for your exact part number.</li>
-            <li><strong>Drivers/STM32L4xx_HAL_Driver</strong> &mdash; the HAL source (<code style="font-family: monospace; color: #273540;">.c</code>) and header (<code style="font-family: monospace; color: #273540;">.h</code>) files for every peripheral, including <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.c</code> and <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_uart.c</code>, which you will call directly.</li>
-            <li>A stock <strong>linker script</strong> and <strong>hal_conf.h</strong> configuration header for the NUCLEO-L496ZG-P, taken from ST's bare <em>Templates</em> reference project &mdash; these are boilerplate chip bring-up files, not peripheral configuration, so you copy them as-is rather than generating them.</li>
-        </ul>
+        <p>CMake is an industry-standard, cross-platform build system generator. When you select <strong>CMake</strong> as the toolchain in CubeMX's Project Manager, CubeMX outputs a <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> that describes all source files, include paths, compiler flags, and linker scripts for your project. The STM32CubeIDE for VS Code extension pack (through its bundled Microsoft CMake Tools component) then reads this file to drive the actual compilation with <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>, using the compiler that the extension's Bundle Manager downloaded for you. You do not need to write or edit the CMakeLists.txt by hand.</p>
         <hr style="margin: 30px 0px; border: 1px solid #cccccc;" />
         <h2><span style="color: #004b87;">Procedure</span></h2>
         <h3>1. Create an STMicroelectronics Account</h3>
@@ -56,7 +49,6 @@
             <li>Return to <strong>https://www.st.com</strong> and sign in with your new credentials before proceeding. The download buttons in the next steps will not function if you are not signed in.</li>
         </ol>
         <h3>2. Download and Install STM32CubeMX</h3>
-        <p>You will only use STM32CubeMX in this lab to download the STM32CubeL4 firmware package in Step 5. You will never create a project, open the Pinout view, or click Generate Code in this application.</p>
         <ol>
             <li>Navigate to the STM32CubeMX product page: <strong>https://www.st.com/en/development-tools/stm32cubemx.html</strong></li>
             <li>Scroll down to the <strong>Get Software</strong> section and click the <strong>Get latest</strong> button next to the Windows installer. You will be presented with a license agreement; read it, check the acceptance box, and click <strong>Download</strong>.</li>
@@ -95,11 +87,11 @@
         <p>There is no CubeCLT installation path to configure anymore. Instead, the extension's <strong>Bundle Manager</strong> automatically downloads the exact tool versions your project needs &mdash; the ARM GCC compiler, CMake, Ninja, and the debug/flash adapter (which includes STM32CubeProgrammer) &mdash; the first time you open or build an STM32Cube project.</p>
         <ol>
             <li>Click the new <strong>STM32Cube</strong> icon in the Activity Bar to open its panel and confirm you can see the <strong>Bundle Manager</strong> view.</li>
-            <li>You do not need to install anything yet. Once you open your hand-built project folder later in this lab (Step 7), VS Code will detect that it needs a compiler and debug toolchain and will prompt you, either through a notification or an entry in the Bundle Manager view, to download the required bundle.</li>
+            <li>You do not need to install anything yet. Once you open your generated project later in this lab (Step 8), VS Code will detect that it needs a compiler and debug toolchain and will prompt you, either through a notification or an entry in the Bundle Manager view, to download the required bundle.</li>
             <li>When prompted, click <strong>Install</strong> (or <strong>Download</strong>) and let the Bundle Manager fetch the toolchain. This step replaces the old CubeCLT installer entirely and does not require you to know an installation path or edit any VS Code settings.</li>
         </ol>
         <h3>5. Install the STM32CubeL4 Firmware Package</h3>
-        <p>The STM32CubeL4 firmware package contains the device-specific CMSIS headers and HAL driver source for the L496 microcontroller that you will copy into your own project by hand in Step 6. You will install it now through CubeMX's built-in package manager &mdash; this is the only thing you will use CubeMX for in this lab.</p>
+        <p>STM32CubeMX needs the device-specific HAL library (the STM32CubeL4 firmware package) to generate correct driver code for the L496 microcontroller. You will install it now through CubeMX's built-in package manager.</p>
         <ol>
             <li>Launch <strong>STM32CubeMX</strong> from the Start menu or the desktop shortcut.<br /><img src="/courses/271388/files/33979091/preview" alt="image.png" /></li>
             <li>When the CubeMX home screen loads, click the <strong>Help</strong> menu in the top menu bar and select <strong>Manage embedded software packages</strong>.<br /><img src="/courses/271388/files/33979092/preview" alt="image.png" /><br />The Embedded Software Packages Manager window will open.</li>
@@ -110,299 +102,143 @@
             <li>When the installation completes, the version row will show a green icon. <br /><img src="/courses/271388/files/33979715/preview" alt="image.png" /><br />Close the Embedded Software Packages Manager by clicking the <strong>X</strong> button.</li>
         </ol>
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0;"><strong>Why is this necessary?</strong> The STM32CubeL4 firmware package contains the HAL source files (<code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.c</code>, <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_uart.c</code>, etc.) and the CMSIS startup files you will copy into your project by hand in Step 6. Without this package downloaded, there is no library source to build against for L-series devices.</p>
+            <p style="margin: 0;"><strong>Why is this necessary?</strong> The STM32CubeL4 firmware package contains the HAL source files (<code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.c</code>, <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_uart.c</code>, etc.) and the CMSIS startup files that CubeMX copies into your project. Without this package installed, CubeMX cannot generate a complete, compilable project for L-series devices.</p>
         </div>
-        <h3>6. Assemble a Bare HAL Project by Hand</h3>
-        <p>This is the step that replaces STM32CubeMX's project generator. You will create every file yourself, copying only the vendor CMSIS/HAL source and the minimum chip bring-up boilerplate (linker script, startup file, HAL feature-config header) from the firmware package you downloaded in Step 5. Everything that touches a peripheral &mdash; clocks, GPIO, UART &mdash; you write from scratch in Step 9.</p>
-        <h4>6a. Create the Folder Skeleton</h4>
+        <h3>6. Create a New STM32CubeMX Project for the NUCLEO-L496ZG-P</h3>
         <ol>
-            <li>Choose a project folder, e.g. <code style="font-family: monospace; color: #273540;">C:\Users\YourName\STM32Projects\Lab1_NUCLEO_L496\</code>. Avoid paths with spaces or special characters.</li>
-            <li>Inside it, create the following empty folders: <code style="font-family: monospace; color: #273540;">Core\Inc</code>, <code style="font-family: monospace; color: #273540;">Core\Src</code>, <code style="font-family: monospace; color: #273540;">Core\Startup</code>, <code style="font-family: monospace; color: #273540;">Drivers</code>, and <code style="font-family: monospace; color: #273540;">cmake</code>. You should end up with:
+            <li>In STM32CubeMX, click <strong>ACCESS TO BOARD SELECTOR</strong> on the home screen. (If CubeMX is already open with a project, go to <strong>File &rarr; New Project</strong> and then click the <strong>Board Selector</strong> tab at the top of the dialog.)<br /><img src="/courses/271388/files/33979719/preview" alt="image.png" /></li>
+            <li>The Board Selector view will open. In the <strong>Commercial Part Number</strong> search field on the left, type exactly:
+                <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">NUCLEO-L496ZG-P</pre>
+            </li>
+            <li>A single result will appear in the board list on the right. Click on the board image or the row to select it. You will see the board description, documentation links, and a photo of the NUCLEO-L496ZG-P. Confirm it shows <strong>STM32L496ZGTxP</strong> as the MCU.<br /><img src="/courses/271388/files/33979723/preview" alt="image.png" /></li>
+            <li>Select the board and click the <strong>Start Project</strong> button in the top-right area of the window (it may also be labeled <strong>Create Project</strong>).<br /><img src="/courses/271388/files/33979778/preview" alt="image.png" /></li>
+            <li>A dialog box will appear asking: <em>"Initialize all peripherals with their default Mode?"</em> <br />Click <strong>Yes</strong>. This is the only peripheral-configuration decision you make in this lab &mdash; it configures the board's built-in LEDs, user button, and ST-LINK UART connection automatically, matching the physical hardware connections on the PCB, without you ever opening the Pinout &amp; Configuration GUI to set individual pin modes.</li>
+            <li>CubeMX will switch to the <strong>Pinout &amp; Configuration</strong> view. You do not need to click anything here &mdash; the die image simply shows the pins the default-mode dialog just configured for you (green = GPIO outputs/LEDs, yellow = button input, blue = USART3 TX/RX). Proceed directly to Step 7.</li>
+        </ol>
+        <h3>7. Configure the Project Manager and Generate Code</h3>
+        <ol>
+            <li>Click the <strong>Project Manager</strong> tab at the top of the CubeMX window.</li>
+            <li>In the <strong>Project</strong> sub-tab (selected by default on the left), fill in the following:
+                <ul>
+                    <li><strong>Project Name:</strong> Enter <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code></li>
+                    <li><strong>Project Location:</strong> Click <strong>Browse</strong> and choose a folder where you want to save your STM32 projects. A dedicated folder such as <code style="font-family: monospace; color: #273540;">C:\Users\YourName\STM32Projects\</code> is a good choice. Avoid paths with spaces or special characters &mdash; they can cause build failures.</li>
+                    <li><strong>Application Structure:</strong> Leave this set to <strong>Advanced</strong>. The Advanced structure separates the auto-generated driver code from your application code, which keeps the project organized.</li>
+                    <li><strong>Toolchain / IDE:</strong> Click the dropdown and select <strong>CMake</strong>. This is the most important setting. Do not select STM32CubeIDE, Makefile, or any other option. If CMake is not selected, the STM32CubeIDE for VS Code extension will not be able to build the project.</li>
+                </ul>
+            </li>
+            <li>Click the <strong>Code Generator</strong> sub-tab on the left side of the Project Manager. Under <strong>STM32Cube Firmware Library Package</strong>, make sure <strong>Copy only the necessary library files</strong> is selected. This keeps the generated project folder compact by only copying the HAL source files that your project actually uses.</li>
+            <li>Click the <strong>GENERATE CODE</strong> button in the top-right corner of the CubeMX window. A progress dialog will appear. Generation typically completes in about 10&ndash;20 seconds.</li>
+            <li>When code generation is complete, a small popup dialog will appear offering to <strong>Open Folder</strong> or <strong>Open Project</strong>. Click <strong>Open Folder</strong> to reveal the generated project folder in Windows File Explorer.</li>
+            <li>In File Explorer, examine the contents of the newly created <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496\</code> folder. You should see the following structure:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">Lab1_NUCLEO_L496/
-├── CMakeLists.txt              &larr; you will write this (6f)
-├── STM32L496ZGTX_FLASH.ld      &larr; copied from the firmware package (6c)
-├── cmake/
-│   └── gcc-arm-none-eabi.cmake &larr; you will write this (6f)
+├── CMakeLists.txt          &larr; top-level CMake build definition
+├── Lab1_NUCLEO_L496.ioc    &larr; CubeMX project file (re-open to regenerate)
 ├── Core/
-│   ├── Inc/                    &larr; main.h, stm32l4xx_it.h, stm32l4xx_hal_conf.h
-│   ├── Src/                    &larr; main.c, stm32l4xx_it.c, system_stm32l4xx.c
-│   └── Startup/                &larr; startup_stm32l496xx.s
-└── Drivers/
-    ├── CMSIS/                  &larr; copied wholesale from the firmware package (6b)
-    └── STM32L4xx_HAL_Driver/   &larr; copied wholesale from the firmware package (6b)</pre>
+│   ├── Inc/
+│   │   ├── main.h          &larr; generated pin and handle declarations
+│   │   └── ...
+│   └── Src/
+│       ├── main.c          &larr; your application code goes here
+│       └── ...
+├── Drivers/
+│   ├── CMSIS/              &larr; ARM core-level headers
+│   └── STM32L4xx_HAL_Driver/ &larr; HAL source files
+└── cmake/                  &larr; CMake toolchain file for arm-none-eabi</pre>
             </li>
         </ol>
-        <h4>6b. Copy the CMSIS and HAL Driver Source</h4>
-        <p>STM32CubeMX's package manager (Step 5) downloaded the firmware package to a local repository cache, typically <code style="font-family: monospace; color: #273540;">C:\Users\YourName\STM32Cube\Repository\STM32Cube_FW_L4_Vx.x.x\</code>.</p>
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>The .ioc File:</strong> The <code style="font-family: monospace; color: #273540;">.ioc</code> file is your CubeMX project file. If you need to change a peripheral setting in the future, open this file with STM32CubeMX, make your changes in the GUI, and click Generate Code again. All <code style="font-family: monospace; color: #273540;">/* USER CODE BEGIN */</code> &hellip; <code style="font-family: monospace; color: #273540;">/* USER CODE END */</code> sections in your source files will be preserved during regeneration. Never place application code outside of these markers.</p>
+        </div>
+        <h3>8. Open the Project in Visual Studio Code</h3>
         <ol>
-            <li>From that cache folder, copy the entire <code style="font-family: monospace; color: #273540;">Drivers\CMSIS</code> folder into your project's <code style="font-family: monospace; color: #273540;">Drivers\CMSIS</code>.</li>
-            <li>Copy the entire <code style="font-family: monospace; color: #273540;">Drivers\STM32L4xx_HAL_Driver</code> folder into your project's <code style="font-family: monospace; color: #273540;">Drivers\STM32L4xx_HAL_Driver</code>. This gives you <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.c/.h</code>, <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_uart.c/.h</code>, <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_rcc.c/.h</code>, and every other HAL module &mdash; the exact same source CubeMX would have copied for you.</li>
-        </ol>
-        <h4>6c. Copy the Startup File and Linker Script</h4>
-        <ol>
-            <li>Copy <code style="font-family: monospace; color: #273540;">Drivers\CMSIS\Device\ST\STM32L4xx\Source\Templates\gcc\startup_stm32l496xx.s</code> into your project's <code style="font-family: monospace; color: #273540;">Core\Startup\</code> folder. This is the CMSIS-provided reset/interrupt vector table and reset handler for the exact L496 part &mdash; low-level chip bring-up code, not peripheral configuration, so you copy it rather than author it.</li>
-            <li>Copy <code style="font-family: monospace; color: #273540;">Projects\NUCLEO-L496ZG-P\Templates\STM32CubeIDE\STM32L496ZGTX_FLASH.ld</code> from the firmware package into the root of your project folder. This linker script describes the L496's 1&nbsp;MB Flash and 320&nbsp;KB SRAM memory map.</li>
-        </ol>
-        <h4>6d. Copy the System Init File and HAL Configuration Header</h4>
-        <ol>
-            <li>Copy <code style="font-family: monospace; color: #273540;">Projects\NUCLEO-L496ZG-P\Templates\Src\system_stm32l4xx.c</code> into your project's <code style="font-family: monospace; color: #273540;">Core\Src\</code>. This provides <code style="font-family: monospace; color: #273540;">SystemInit()</code>, which the startup file calls before <code style="font-family: monospace; color: #273540;">main()</code> to enable the FPU and set the vector table location.</li>
-            <li>Copy <code style="font-family: monospace; color: #273540;">Projects\NUCLEO-L496ZG-P\Templates\Inc\stm32l4xx_hal_conf.h</code> into your project's <code style="font-family: monospace; color: #273540;">Core\Inc\</code>. This header simply lists which HAL modules to compile in (GPIO, UART, RCC, CORTEX, etc. are already enabled by default) and defines oscillator frequency constants &mdash; it is build configuration, not pin/peripheral configuration.</li>
-        </ol>
-        <h4>6e. Write main.h and the Interrupt Handler File</h4>
-        <ol>
-            <li>Create <code style="font-family: monospace; color: #273540;">Core\Inc\main.h</code> with the following minimal content:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#ifndef __MAIN_H
-#define __MAIN_H
-
-#include "stm32l4xx_hal.h"
-
-#endif /* __MAIN_H */</pre>
-            </li>
-            <li>Create <code style="font-family: monospace; color: #273540;">Core\Inc\stm32l4xx_it.h</code>:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#ifndef __STM32L4xx_IT_H
-#define __STM32L4xx_IT_H
-
-void SysTick_Handler(void);
-
-#endif /* __STM32L4xx_IT_H */</pre>
-            </li>
-            <li>Create <code style="font-family: monospace; color: #273540;">Core\Src\stm32l4xx_it.c</code>. The startup file already provides a weak default (empty, infinite-loop) handler for every interrupt, but <code style="font-family: monospace; color: #273540;">HAL_Delay()</code> needs the SysTick handler to actually advance the HAL's millisecond tick counter, so you must override it:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#include "main.h"
-#include "stm32l4xx_it.h"
-
-void SysTick_Handler(void)
-{
-  HAL_IncTick();
-}</pre>
-                Without this, <code style="font-family: monospace; color: #273540;">HAL_Delay()</code> and <code style="font-family: monospace; color: #273540;">HAL_GetTick()</code> would never return &mdash; every millisecond tick interrupt would hit the vector table's default handler and spin forever instead of incrementing the counter the HAL relies on.
-            </li>
-        </ol>
-        <h4>6f. Write CMakeLists.txt and the Toolchain File</h4>
-        <ol>
-            <li>Create <code style="font-family: monospace; color: #273540;">cmake\gcc-arm-none-eabi.cmake</code>:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">set(CMAKE_SYSTEM_NAME Generic)
-set(CMAKE_SYSTEM_PROCESSOR arm)
-
-set(CMAKE_C_COMPILER   arm-none-eabi-gcc)
-set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
-set(CMAKE_OBJCOPY      arm-none-eabi-objcopy)
-set(CMAKE_SIZE         arm-none-eabi-size)
-
-set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
-
-set(CPU_FLAGS "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard")
-set(CMAKE_C_FLAGS   "${CPU_FLAGS} -Wall -ffunction-sections -fdata-sections")
-set(CMAKE_ASM_FLAGS "${CPU_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS "${CPU_FLAGS} -specs=nano.specs -Wl,--gc-sections")</pre>
-                This tells CMake to cross-compile for a Cortex-M4 with a hardware FPU using the compiler the Bundle Manager will download in Step 7, instead of your host machine's own compiler.
-            </li>
-            <li>Create <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> in the project root:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cmake_minimum_required(VERSION 3.20)
-
-set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/cmake/gcc-arm-none-eabi.cmake)
-
-project(Lab1_NUCLEO_L496 C ASM)
-
-add_executable(${PROJECT_NAME}
-    Core/Src/main.c
-    Core/Src/stm32l4xx_it.c
-    Core/Src/system_stm32l4xx.c
-    Core/Startup/startup_stm32l496xx.s
-
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_cortex.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_rcc.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_rcc_ex.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_gpio.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_uart.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_uart_ex.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_pwr.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_pwr_ex.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_flash.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_flash_ex.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_dma.c
-    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_exti.c
-)
-
-target_include_directories(${PROJECT_NAME} PRIVATE
-    Core/Inc
-    Drivers/CMSIS/Include
-    Drivers/CMSIS/Device/ST/STM32L4xx/Include
-    Drivers/STM32L4xx_HAL_Driver/Inc
-)
-
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    STM32L496xx
-    USE_HAL_DRIVER
-)
-
-target_link_options(${PROJECT_NAME} PRIVATE
-    -T${CMAKE_SOURCE_DIR}/STM32L496ZGTX_FLASH.ld
-    -Wl,-Map=${PROJECT_NAME}.map
-)
-
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${PROJECT_NAME}>
-)</pre>
-                Every source file listed here is one you either copied from the firmware package or will write yourself in the next steps &mdash; there is no generated file anywhere in this list.
-            </li>
-        </ol>
-        <h3>7. Open the Project in Visual Studio Code and Select a Toolchain</h3>
-        <ol>
-            <li>In File Explorer, right-click your <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code> folder and select <strong>Open with Code</strong> (or use VS Code's <strong>File &rarr; Open Folder&hellip;</strong>).</li>
-            <li>VS Code may display a dialog: <em>"Do you trust the authors of the files in this folder?"</em> Click <strong>Yes, I trust the authors</strong>.</li>
-            <li>Because there is no <code style="font-family: monospace; color: #273540;">.ioc</code> file, the extension's automatic Cube Discovery will not fire. Instead, open the <strong>STM32Cube</strong> panel's <strong>Bundle Manager</strong> view and manually request a toolchain download for the <strong>STM32L4</strong> series, or open the Command Palette (<strong>Ctrl+Shift+P</strong>) and run a Bundle Manager download command. Click <strong>Install</strong> (or <strong>Download</strong>) and let it fetch the ARM GCC compiler, CMake, Ninja, and the debug/flash adapter.</li>
-            <li>Once the bundle finishes downloading, open the Command Palette and run <code style="font-family: monospace; color: #273540;">CMake: Select a Kit</code>. Choose (or manually browse to) the <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code> executable the Bundle Manager just installed.</li>
-            <li>Run <code style="font-family: monospace; color: #273540;">CMake: Configure</code> from the Command Palette. You will see output in the <strong>Output</strong> panel (select the <strong>CMake/Build</strong> tab from the dropdown) ending with:
+            <li>In Windows File Explorer, right-click on the <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code> folder (the root folder that contains <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>) and select <strong>Open with Code</strong>. This opens the entire project folder as the VS Code workspace.</li>
+            <li>If <strong>Open with Code</strong> does not appear in the right-click menu, open VS Code manually and then go to <strong>File &rarr; Open Folder&hellip;</strong> and navigate to your <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code> folder.</li>
+            <li>VS Code may display a dialog: <em>"Do you trust the authors of the files in this folder?"</em> Click <strong>Yes, I trust the authors</strong>. This enables all extension features for this folder.</li>
+            <li>The STM32CubeIDE for VS Code extension pack runs a <strong>Cube Discovery</strong> process that automatically detects the <code style="font-family: monospace; color: #273540;">.ioc</code> file and the generated <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>, and recognizes the folder as an STM32Cube project. You will see activity in the blue status bar and typically a notification confirming the project was recognized. The bundled CMake Tools extension will automatically locate <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>.</li>
+            <li>Because this is likely the first STM32Cube project you have opened on this machine, the extension will notify you that it needs to download a matching toolchain bundle (the ARM GCC compiler, CMake, Ninja, and the debug/flash adapter). Click <strong>Install</strong> (or <strong>Download</strong>) on the notification, or open the <strong>STM32Cube</strong> panel's <strong>Bundle Manager</strong> view and install the bundle it recommends for this project. This one-time download replaces the old manual CubeCLT installation and path configuration entirely.</li>
+            <li>Once the bundle finishes downloading, CMake Tools automatically configures the project using the toolchain the Bundle Manager just installed &mdash; you do not need to manually browse for or select a compiler path. You will see output in the <strong>Output</strong> panel at the bottom (select the <strong>CMake/Build</strong> tab from the dropdown in that panel) ending with:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">-- Configuring done
 -- Build files have been written to: ...</pre>
+                If configuration does not start automatically, open the Command Palette (<strong>Ctrl+Shift+P</strong>) and run <code style="font-family: monospace; color: #273540;">CMake: Configure</code>.
             </li>
-            <li>If configuration fails complaining about a missing source file, double-check every file path in <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> against what you actually copied in Step 6 &mdash; a typo'd filename is the most common cause at this stage.</li>
+            <li>If you see errors at this stage, the most common cause is a bundle download that has not finished yet or failed &mdash; check the Bundle Manager view for progress or error messages, and confirm you have an active internet connection.</li>
         </ol>
-        <h3>8. Build the Empty Skeleton</h3>
-        <p>Before writing any peripheral code, verify your hand-built project compiles and links successfully with just <code style="font-family: monospace; color: #273540;">HAL_Init()</code> in <code style="font-family: monospace; color: #273540;">main()</code>. This confirms your CMakeLists.txt, linker script, and startup file are all wired together correctly before you add application logic.</p>
+        <h3>9. Build the Default Project</h3>
+        <p>Before adding any application code, verify that the unmodified, generated project compiles successfully. This confirms your toolchain is working end-to-end.</p>
         <ol>
-            <li>Create a minimal <code style="font-family: monospace; color: #273540;">Core\Src\main.c</code> for now, just to prove the toolchain works:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#include "main.h"
-
-int main(void)
-{
-  HAL_Init();
-
-  while (1)
-  {
-  }
-}</pre>
-            </li>
-            <li>Click the <strong>STM32Cube</strong> icon in the left Activity Bar, then click <strong>Build</strong>. Alternatively, press <strong>Ctrl+Shift+P</strong>, run <code style="font-family: monospace; color: #273540;">CMake: Build</code>.</li>
+            <li>Click the <strong>STM32Cube</strong> icon in the left Activity Bar to open its panel. You will see project actions including <strong>Build</strong>, <strong>Flash</strong>, and <strong>Debug</strong>.</li>
+            <li>Click the <strong>Build</strong> action in the STM32Cube panel. Alternatively, you can press <strong>Ctrl+Shift+P</strong> to open the Command Palette, type <code style="font-family: monospace; color: #273540;">CMake: Build</code>, and press <strong>Enter</strong>.</li>
+            <li>The <strong>Terminal</strong> panel at the bottom of VS Code will open and display the build output. You will see CMake invoking <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code> to compile each source file, followed by a linker step. The build should complete in 15&ndash;60 seconds depending on your machine speed.</li>
             <li>A successful build ends with a message similar to:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">[100%] Linking C executable Lab1_NUCLEO_L496.elf
    text    data     bss     dec     hex filename
-   1848      12     1560   3420    d5c Lab1_NUCLEO_L496.elf
+  10548     152    1668   12368    3050 Lab1_NUCLEO_L496.elf
 [100%] Built target Lab1_NUCLEO_L496</pre>
-                The numbers will differ, but the key indicators of success are <strong>0 errors</strong> and a produced <code style="font-family: monospace; color: #273540;">.elf</code> file.
+                The numbers will differ slightly from the above, but the key indicators of success are <strong>0 errors</strong> and the presence of a <code style="font-family: monospace; color: #273540;">.elf</code> file in the output.
             </li>
-            <li>If the build fails with undefined-reference linker errors, the most common cause is a missing source file in <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> (e.g., you use a HAL function but never listed the <code style="font-family: monospace; color: #273540;">.c</code> file that implements it). If it fails with "compiler not found," re-check your CMake kit selection from Step 7.</li>
+            <li>If the build produces errors, the most common causes are:
+                <ul>
+                    <li>The toolchain bundle has not finished downloading &mdash; check the Bundle Manager view in the STM32Cube panel for progress or errors (see Step 8).</li>
+                    <li>CMake configuration not completed &mdash; check that the Output panel showed "Configuring done".</li>
+                    <li>A blocked or interrupted network connection prevented the Bundle Manager from downloading the compiler.</li>
+                </ul>
+            </li>
         </ol>
-        <h3>9. Write the Verification Firmware</h3>
-        <p>Now write the real <code style="font-family: monospace; color: #273540;">main.c</code> by hand: configure the system clock, initialize GPIO for the LEDs, initialize USART3, then blink LD1 and stream a status message once per second. There are no USER CODE markers in this project because there is no generator to preserve code <em>from</em> &mdash; the entire file is yours.</p>
+        <h3>10. Write the Verification Firmware</h3>
+        <p>Now you will modify <code style="font-family: monospace; color: #273540;">main.c</code> to add a blinking LED and a UART status stream. Every edit you make <strong>must</strong> be placed inside the designated <code style="font-family: monospace; color: #273540;">/* USER CODE BEGIN */</code> and <code style="font-family: monospace; color: #273540;">/* USER CODE END */</code> markers. Code outside those markers is owned by CubeMX and will be deleted the next time you regenerate.</p>
         <ol>
-            <li>Open <code style="font-family: monospace; color: #273540;">Core\Src\main.c</code> and replace its contents with the includes, handle, and clock configuration below:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#include "main.h"
+            <li>In the VS Code Explorer panel (left sidebar), expand <strong>Core &rarr; Src</strong> and click on <strong>main.c</strong> to open it.</li>
+            <li>Scroll down to find the section that reads:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">/* USER CODE BEGIN Includes */
+
+/* USER CODE END Includes */</pre>
+                Place your cursor on the blank line between the two markers and add the following two include statements:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">/* USER CODE BEGIN Includes */
 #include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
-
-UART_HandleTypeDef huart3;
-
+/* USER CODE END Includes */</pre>
+                These standard C headers give you access to <code style="font-family: monospace; color: #273540;">snprintf()</code> (for formatting strings) and <code style="font-family: monospace; color: #273540;">strlen()</code> (for measuring string length), both needed for UART output.
+            </li>
+            <li>Scroll further down to find the <strong>USER CODE BEGIN 0</strong> section, which appears just before the <code style="font-family: monospace; color: #273540;">int main(void)</code> line. Add these two variable declarations:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">/* USER CODE BEGIN 0 */
 static uint32_t seconds_elapsed = 0;
 static char     uart_buf[80];
-
-/* Configures SYSCLK = 80 MHz using the MSI-driven PLL (MSI=4MHz, PLLM=1,
- * PLLN=40, PLLR=2). This is the standard 80 MHz recipe ST documents for
- * this device; you would normally never need to touch this again. */
-static void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-  RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 40;
-  RCC_OscInitStruct.PLL.PLLR = 2;
-  RCC_OscInitStruct.PLL.PLLP = 7;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
-  if (HAL_RCC_OscConfig(&amp;RCC_OscInitStruct) != HAL_OK)
-  {
-    while (1);
-  }
-
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK |
-                                 RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  if (HAL_RCC_ClockConfig(&amp;RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
-  {
-    while (1);
-  }
-}</pre>
-                This yields an 80&nbsp;MHz system clock &mdash; the maximum for the L496 &mdash; matching the value CubeMX would have selected by default.
+/* USER CODE END 0 */</pre>
+                <code style="font-family: monospace; color: #273540;">seconds_elapsed</code> will count how many seconds the board has been running, and <code style="font-family: monospace; color: #273540;">uart_buf</code> is the buffer into which formatted messages will be written before transmission.
             </li>
-            <li>Below <code style="font-family: monospace; color: #273540;">SystemClock_Config()</code>, add the GPIO and UART init functions you are writing by hand, using the pin table from the Background section (LD1 = <strong>PC7</strong>, USART3 = <strong>PD8</strong>/<strong>PD9</strong> on <strong>AF7</strong>):
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">static void LED_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-
-  GPIO_InitStruct.Pin   = GPIO_PIN_7;              /* LD1 (green) on PC7 */
-  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull  = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &amp;GPIO_InitStruct);
-}
-
-static void USART3_UART_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_USART3_CLK_ENABLE();
-
-  GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9;  /* PD8=TX, PD9=RX */
-  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull      = GPIO_NOPULL;
-  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
-  HAL_GPIO_Init(GPIOD, &amp;GPIO_InitStruct);
-
-  huart3.Instance          = USART3;
-  huart3.Init.BaudRate     = 115200;
-  huart3.Init.WordLength   = UART_WORDLENGTH_8B;
-  huart3.Init.StopBits     = UART_STOPBITS_1;
-  huart3.Init.Parity       = UART_PARITY_NONE;
-  huart3.Init.Mode         = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
-  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&amp;huart3) != HAL_OK)
-  {
-    while (1);
-  }
-}</pre>
-                Notice there is no separate MSP file &mdash; you enabled the GPIOC/GPIOD/USART3 peripheral clocks and configured the pins directly, in the same function, before calling <code style="font-family: monospace; color: #273540;">HAL_UART_Init()</code>. CubeMX would have split this across <code style="font-family: monospace; color: #273540;">main.c</code> and <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_msp.c</code>; here it is all in one place so you can see exactly what has to happen and in what order.
+            <li>Inside <code style="font-family: monospace; color: #273540;">main()</code>, scroll past all of the peripheral initialization calls (e.g., <code style="font-family: monospace; color: #273540;">MX_GPIO_Init()</code>, <code style="font-family: monospace; color: #273540;">MX_USART3_UART_Init()</code>) until you find the <strong>USER CODE BEGIN 2</strong> section. Add the startup message transmission here:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">/* USER CODE BEGIN 2 */
+const char *startup_msg =
+    "\r\n==============================\r\n"
+    "  ECGR-4101 Lab 1 Verification \r\n"
+    "  NUCLEO-L496ZG-P Ready        \r\n"
+    "==============================\r\n";
+HAL_UART_Transmit(&amp;huart3, (uint8_t *)startup_msg,
+                  strlen(startup_msg), HAL_MAX_DELAY);
+/* USER CODE END 2 */</pre>
+                <code style="font-family: monospace; color: #273540;">huart3</code> is the HAL UART handle generated by CubeMX for USART3 (the ST-LINK virtual COM port). <code style="font-family: monospace; color: #273540;">HAL_MAX_DELAY</code> means the call will block until the transmission is fully complete before returning.
             </li>
-            <li>Finally, write <code style="font-family: monospace; color: #273540;">main()</code> itself:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">int main(void)
-{
-  HAL_Init();
-  SystemClock_Config();
-  LED_GPIO_Init();
-  USART3_UART_Init();
+            <li>Scroll further down into the infinite loop. Find the section that reads:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
 
-  const char *startup_msg =
-      "\r\n==============================\r\n"
-      "  ECGR-4101 Lab 1 Verification \r\n"
-      "  NUCLEO-L496ZG-P Ready        \r\n"
-      "==============================\r\n";
-  HAL_UART_Transmit(&amp;huart3, (uint8_t *)startup_msg,
-                    strlen(startup_msg), HAL_MAX_DELAY);
-
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */</pre>
+                Replace the <strong>contents</strong> of the loop (between WHILE and END WHILE) with the following application logic. Your completed loop section should look exactly like this:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">  /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* Toggle the green user LED (LD1) */
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
+    HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 
     /* Format a status message and send it over USART3 */
     int msg_len = snprintf(uart_buf, sizeof(uart_buf),
                            "Lab 1 OK  |  t = %4lu s  |  LD1 = %s\r\n",
                            seconds_elapsed,
-                           HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) ? "ON " : "OFF");
+                           HAL_GPIO_ReadPin(LD1_GPIO_Port, LD1_Pin) ? "ON " : "OFF");
     HAL_UART_Transmit(&amp;huart3, (uint8_t *)uart_buf,
                       (uint16_t)msg_len, HAL_MAX_DELAY);
 
@@ -410,40 +246,44 @@ static void USART3_UART_Init(void)
 
     /* Wait 1000 ms before the next iteration */
     HAL_Delay(1000);
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
-}</pre>
+  /* USER CODE END 3 */</pre>
             </li>
             <li>Press <strong>Ctrl+S</strong> to save <code style="font-family: monospace; color: #273540;">main.c</code>.</li>
         </ol>
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0 0 8px 0;"><strong>Code explanation:</strong></p>
             <ul style="margin: 0; padding-left: 20px;">
-                <li><code style="font-family: monospace; color: #273540;">HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7)</code> &mdash; Reads the current output latch of PC7 and writes the opposite value, toggling LD1 between on and off with each call. Ctrl+Click into <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.h</code> to see this and the other GPIO functions available to you.</li>
+                <li><code style="font-family: monospace; color: #273540;">HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin)</code> &mdash; Reads the current output latch of the LD1 pin and writes the opposite value, toggling the LED between on and off with each call. The macros <code style="font-family: monospace; color: #273540;">LD1_GPIO_Port</code> and <code style="font-family: monospace; color: #273540;">LD1_Pin</code> are defined in the generated <code style="font-family: monospace; color: #273540;">main.h</code> &mdash; you can Ctrl+Click on them to verify the actual port and pin number.</li>
                 <li><code style="font-family: monospace; color: #273540;">snprintf(uart_buf, sizeof(uart_buf), ...)</code> &mdash; Safely formats a string into <code style="font-family: monospace; color: #273540;">uart_buf</code> without risking a buffer overflow. It returns the number of characters written, which we store in <code style="font-family: monospace; color: #273540;">msg_len</code> and pass to <code style="font-family: monospace; color: #273540;">HAL_UART_Transmit()</code> so the HAL knows exactly how many bytes to send.</li>
                 <li><code style="font-family: monospace; color: #273540;">HAL_Delay(1000)</code> &mdash; Puts the processor into a busy-wait loop for exactly 1000 milliseconds, producing a 1 Hz LED toggle rate and one UART message per second.</li>
             </ul>
         </div>
-        <h3>10. Rebuild the Project</h3>
+        <h3>11. Rebuild the Project</h3>
         <ol>
             <li>Click the <strong>Build</strong> action in the STM32Cube panel, or press <strong>Ctrl+Shift+B</strong>.</li>
             <li>Confirm the build completes with <strong>0 errors</strong>. If you see errors, carefully compare your code to the snippets above, paying close attention to:
                 <ul>
+                    <li>Correct placement of code inside the USER CODE markers (not before <code style="font-family: monospace; color: #273540;">BEGIN</code> or after <code style="font-family: monospace; color: #273540;">END</code>).</li>
                     <li>Correct UART handle name: use <code style="font-family: monospace; color: #273540;">huart3</code>, not <code style="font-family: monospace; color: #273540;">huart1</code> or <code style="font-family: monospace; color: #273540;">husart3</code>.</li>
                     <li>The <code style="font-family: monospace; color: #273540;">&amp;</code> operator before <code style="font-family: monospace; color: #273540;">huart3</code> in <code style="font-family: monospace; color: #273540;">HAL_UART_Transmit()</code> &mdash; you are passing a pointer to the handle, not the handle itself.</li>
-                    <li>The correct GPIO port/pin: LD1 is <code style="font-family: monospace; color: #273540;">GPIOC</code> / <code style="font-family: monospace; color: #273540;">GPIO_PIN_7</code>, not <code style="font-family: monospace; color: #273540;">GPIOD</code> or a different pin number.</li>
+                    <li>The correct macro names: Ctrl+Click on <code style="font-family: monospace; color: #273540;">LD1_Pin</code> to navigate to its definition in <code style="font-family: monospace; color: #273540;">main.h</code> and confirm the macro exists.</li>
                 </ul>
             </li>
         </ol>
-        <h3>11. Connect the NUCLEO-L496ZG-P and Install the Driver</h3>
+        <h3>12. Connect the NUCLEO-L496ZG-P and Install the Driver</h3>
         <ol>
             <li>Plug one end of your Micro-USB cable into the port on the NUCLEO board labeled <strong>USB ST-LINK (CN1)</strong>. This connector is near the ST-LINK chip at the top edge of the board (the portion of the board above the thin blue line separating the ST-LINK section from the target MCU section).</li>
             <li>Plug the other end of the cable into any USB port on your laptop.</li>
             <li>The green power LED (<strong>LD3 PWR</strong>, not to be confused with the user LD3) near the USB connector on the board should illuminate immediately, confirming the board is receiving power.</li>
-            <li>Windows will detect the new device. A notification may appear saying "Setting up a device." Wait until this completes. The ST-LINK USB driver is installed automatically the first time the STM32CubeIDE for VS Code extension's Bundle Manager downloads the debug/flash bundle (Step 7); if you completed that step, the board should be recognized without any additional driver installation.</li>
-            <li>To confirm the driver is installed correctly, right-click the <strong>Start</strong> button and select <strong>Device Manager</strong>. Expand the <strong>Ports (COM &amp; LPT)</strong> section. You should see an entry labeled <em>STMicroelectronics STLink Virtual COM Port (COMx)</em> where <em>x</em> is a number such as 3, 5, or 7. Make note of this COM port number &mdash; you will need it for the serial terminal in Step 13.</li>
+            <li>Windows will detect the new device. A notification may appear saying "Setting up a device." Wait until this completes. The ST-LINK USB driver is installed automatically the first time the STM32CubeIDE for VS Code extension's Bundle Manager downloads the debug/flash bundle (Step 8); if you completed that step, the board should be recognized without any additional driver installation.</li>
+            <li>To confirm the driver is installed correctly, right-click the <strong>Start</strong> button and select <strong>Device Manager</strong>. Expand the <strong>Ports (COM &amp; LPT)</strong> section. You should see an entry labeled <em>STMicroelectronics STLink Virtual COM Port (COMx)</em> where <em>x</em> is a number such as 3, 5, or 7. Make note of this COM port number &mdash; you will need it for the serial terminal in Step 14.</li>
             <li>In Device Manager, also expand <strong>Universal Serial Bus devices</strong> (or <strong>Other devices</strong>). You should see <em>ST-LINK Debug</em> listed without a yellow warning icon. If you see a yellow exclamation mark, open the <strong>STM32Cube</strong> panel's <strong>Board Manager</strong> view, which can detect the connected ST-LINK and reinstall or update its driver and firmware. If the Board Manager cannot resolve it, download the standalone ST-LINK USB driver directly from ST's website and install it manually.</li>
         </ol>
-        <h3>12. Flash the Firmware to the Board</h3>
+        <h3>13. Flash the Firmware to the Board</h3>
         <ol>
             <li>In VS Code's <strong>STM32Cube</strong> panel, locate the <strong>Flash</strong> action and click it. Alternatively, open the Command Palette with <strong>Ctrl+Shift+P</strong> and search for the STM32Cube flash command.</li>
             <li>The extension will invoke STM32CubeProgrammer &mdash; downloaded automatically by the Bundle Manager along with the rest of the debug/flash bundle &mdash; to communicate with the ST-LINK on your board. The Terminal panel will display progress similar to:
@@ -493,11 +333,11 @@ Application running successfully.</pre>
                 </ul>
             </li>
         </ol>
-        <h3>13. Verify Output with the Built-in Serial Terminal</h3>
+        <h3>14. Verify Output with the Built-in Serial Terminal</h3>
         <p>With the firmware running and LD1 blinking, the final step is to open a serial terminal and read the UART messages the board is sending. The STM32CubeIDE for VS Code extension pack includes a built-in serial terminal, so no additional Serial Monitor extension is required.</p>
         <ol>
             <li>Open the <strong>STM32Cube</strong> panel in the Activity Bar and select its <strong>Serial Terminal</strong> view. Alternatively, open the Command Palette (<strong>Ctrl+Shift+P</strong>) and search for the STM32Cube serial terminal command. A serial terminal panel will appear at the bottom of VS Code.</li>
-            <li>In the serial terminal's toolbar, click the <strong>Port</strong> dropdown and select the COM port you identified in Step 11 (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>).</li>
+            <li>In the serial terminal's toolbar, click the <strong>Port</strong> dropdown and select the COM port you identified in Step 12 (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>).</li>
             <li>Click the <strong>Baud rate</strong> dropdown and select <code style="font-family: monospace; color: #273540;">115200</code>.</li>
             <li>Click the <strong>Connect</strong> / <strong>Start</strong> (play &#9658;) button in the serial terminal toolbar. The terminal will open the port and begin listening.</li>
             <li>Within one second, you should see the startup banner appear in the terminal:
@@ -517,19 +357,23 @@ Lab 1 OK  |  t =    3 s  |  LD1 = ON
                     <li>Verify you have selected the correct COM port. In Device Manager under <strong>Ports (COM &amp; LPT)</strong>, the ST-LINK Virtual COM port will disappear when you unplug the board and reappear when you plug it back in &mdash; use this to identify the correct port number unambiguously.</li>
                     <li>Confirm the baud rate is <strong>115200</strong>. Mismatched baud rates produce garbage characters or no output at all.</li>
                     <li>Press the black RESET button on the NUCLEO board to force the startup message to transmit again while the terminal is open.</li>
-                    <li>Confirm the firmware was flashed successfully by observing the blinking LED. If the LED is not blinking, the flash step may not have completed &mdash; redo Step 12.</li>
+                    <li>Confirm the firmware was flashed successfully by observing the blinking LED. If the LED is not blinking, the flash step may not have completed &mdash; redo Step 13.</li>
                 </ul>
             </li>
         </ol>
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0;"><strong>Alternative Serial Terminal &mdash; PuTTY:</strong> If the built-in serial terminal is not working, you can use PuTTY (download from <strong>https://www.putty.org/</strong>). In PuTTY's configuration dialog, select <strong>Connection type: Serial</strong>, set <strong>Serial line</strong> to your COM port (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>), set <strong>Speed</strong> to <code style="font-family: monospace; color: #273540;">115200</code>, then click <strong>Open</strong>. Press the RESET button on the board to trigger the startup banner if PuTTY was already open when you flashed.</p>
         </div>
-        <h3>14. Checkpoint: Exploring the HAL Source You Used</h3>
-        <p>Before finishing the lab, spend a few minutes exploring the library code you called from <code style="font-family: monospace; color: #273540;">main.c</code>. Understanding this structure is foundational to all future labs in this course.</p>
+        <h3>15. Checkpoint: Exploring the Generated HAL Code</h3>
+        <p>Before finishing the lab, spend a few minutes exploring the code CubeMX generated on your behalf. Understanding this structure is foundational to all future labs in this course.</p>
         <ol>
-            <li>In the VS Code Explorer, open <strong>Drivers &rarr; CMSIS &rarr; Device &rarr; ST &rarr; STM32L4xx &rarr; Include &rarr; stm32l496xx.h</strong> and search for <code style="font-family: monospace; color: #273540;">GPIOC_BASE</code>. This is the raw register base address that <code style="font-family: monospace; color: #273540;">GPIOC</code> (used in your <code style="font-family: monospace; color: #273540;">HAL_GPIO_Init()</code> call) ultimately expands to &mdash; the same value you would have had to look up in the reference manual if you were writing bare-register code instead of using the HAL.</li>
+            <li>In the VS Code Explorer, open <strong>Core &rarr; Inc &rarr; main.h</strong>. Scroll to the section labeled <em>Exported pins</em> or search for the text <code style="font-family: monospace; color: #273540;">LD1_Pin</code>. You will see the actual hardware pin assignment, for example:
+                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#define LD1_Pin          GPIO_PIN_4
+#define LD1_GPIO_Port    GPIOD</pre>
+                This confirms that the green LED is connected to pin PD4 on the L496. The generated macros insulate your application code from these hardware details.
+            </li>
+            <li>Open <strong>Core &rarr; Src &rarr; stm32l4xx_hal_msp.c</strong>. This file contains the MSP (MCU Support Package) functions &mdash; low-level peripheral initialization callbacks (enabling GPIO clocks, configuring DMA channels, etc.) that CubeMX generates and maintains for you. You should recognize the GPIO and UART clock enables inside these functions.</li>
             <li>Open <strong>Drivers &rarr; STM32L4xx_HAL_Driver &rarr; Src &rarr; stm32l4xx_hal_gpio.c</strong>. Browse to the <code style="font-family: monospace; color: #273540;">HAL_GPIO_TogglePin()</code> function definition. Observe how the HAL translates a high-level function call into a single write to the GPIO port's BSRR (Bit Set/Reset Register) &mdash; this is the kind of hardware detail the HAL abstracts away from your application code.</li>
-            <li>Open <strong>Drivers &rarr; STM32L4xx_HAL_Driver &rarr; Src &rarr; stm32l4xx_hal_uart.c</strong> and find <code style="font-family: monospace; color: #273540;">HAL_UART_Init()</code>. Compare its parameter validation and register-write sequence against the <code style="font-family: monospace; color: #273540;">huart3.Init</code> fields you set by hand in Step 9 &mdash; every field you filled in corresponds directly to a register field this function configures.</li>
         </ol>
         <hr style="margin: 30px 0px; border: 1px solid #cccccc;" />
         <h2><span style="color: #004b87;">Verification Tasks</span></h2>
@@ -578,8 +422,9 @@ Lab 1 OK  |  t =    3 s  |  LD1 = ON
         </ul>
         <p>Upload your video to <strong>YouTube only</strong> (not Google Drive, OneDrive, or any other platform). Set the video visibility to <strong>Unlisted</strong> so only people with the link can view it. Copy the video link.</p>
         <p>Save your completed <code style="font-family: monospace; color: #273540;">main.c</code> file as a plain text file (<code style="font-family: monospace; color: #273540;">.txt</code>) using Notepad (open Notepad, paste the entire contents of <code style="font-family: monospace; color: #273540;">main.c</code>, and save as <code style="font-family: monospace; color: #273540;">lastname_firstname_lab1.txt</code>).</p>
-        <p>At the very top of your <code style="font-family: monospace; color: #273540;">main.c</code> file, add a program header block following this format:</p>
-        <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">/**
+        <p>At the very top of your <code style="font-family: monospace; color: #273540;">main.c</code> file, inside the first <code style="font-family: monospace; color: #273540;">/* USER CODE BEGIN Header */</code> section, add a program header block following this format:</p>
+        <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">/* USER CODE BEGIN Header */
+/**
   ******************************************************************************
   * @file    main.c
   * @brief   ECGR-4101 Advanced Embedded Systems
@@ -594,7 +439,8 @@ Lab 1 OK  |  t =    3 s  |  LD1 = ON
   *
   * YouTube Demo: https://youtu.be/YOUR_VIDEO_LINK_HERE
   ******************************************************************************
-  */</pre>
+  */
+/* USER CODE END Header */</pre>
         <p>Submit the <code style="font-family: monospace; color: #273540;">lastname_firstname_lab1.txt</code> file to Canvas. Your YouTube link must be included as a comment in your submitted code as shown above.</p>
     </div>
 </div>
