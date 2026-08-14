@@ -1,7 +1,7 @@
 <div id="dp-wrapper" class="dp-wrapper">
     <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
         <h2><span style="color: #004b87;">Objective</span></h2>
-        <p>In this lab, you will build the complete STM32 embedded development environment from scratch on your laptop. You will install STMicroelectronics' official code-generation tool (STM32CubeMX), the ARM compiler and programmer suite (STM32CubeCLT), and a fully configured Visual Studio Code workspace. Using these tools, you will generate a HAL-based firmware project for the <strong>NUCLEO-L496ZG-P</strong> development board, write a simple verification program that blinks an LED and streams data over a UART serial connection, and confirm end-to-end operation by observing both the physical LED and a serial terminal on your laptop.</p>
+        <p>In this lab, you will build the complete STM32 embedded development environment from scratch on your laptop. You will install STMicroelectronics' official code-generation tool (STM32CubeMX) and the <strong>STM32CubeIDE for VS Code</strong> extension pack, which brings a full C/C++ editing, build, flash, and debug experience directly into Visual Studio Code. Unlike older versions of this tooling, you do <strong>not</strong> need to separately install a command-line tools package &mdash; the extension's built-in Bundle Manager automatically downloads the ARM compiler, debugger, and programmer the first time your project needs them. Using these tools, you will generate a HAL-based firmware project for the <strong>NUCLEO-L496ZG-P</strong> development board, write a simple verification program that blinks an LED and streams data over a UART serial connection, and confirm end-to-end operation by observing both the physical LED and a serial terminal on your laptop.</p>
         <p>By the end of this lab you will be able to: create a new STM32 project from a board template in STM32CubeMX, configure on-chip peripherals through the graphical Pinout view, generate a CMake-based project, build and flash firmware entirely within VS Code, and interpret live serial output from the target board.</p>
         <h2><span style="color: #004b87;">Required Materials</span></h2>
         <ul>
@@ -13,11 +13,10 @@
         <hr style="margin: 30px 0px; border: 1px solid #cccccc;" />
         <h2><span style="color: #004b87;">Background</span></h2>
         <h3>The STM32 Ecosystem</h3>
-        <p>STMicroelectronics produces one of the most widely used families of 32-bit microcontrollers in industry: the STM32 series. These devices are built on ARM Cortex-M cores and span an enormous range of performance and power profiles. To help developers get up and running quickly, ST provides a tightly integrated software ecosystem consisting of three major components you will use throughout this course:</p>
+        <p>STMicroelectronics produces one of the most widely used families of 32-bit microcontrollers in industry: the STM32 series. These devices are built on ARM Cortex-M cores and span an enormous range of performance and power profiles. To help developers get up and running quickly, ST provides a tightly integrated software ecosystem consisting of two major components you will use throughout this course:</p>
         <ul>
             <li><strong>STM32CubeMX</strong> &ndash; A graphical tool that lets you select a target device or development board, configure its pins and peripherals through a visual interface, set up clocks, and then automatically generate a ready-to-compile C project with all of the necessary initialization code already written for you.</li>
-            <li><strong>STM32CubeCLT (Command Line Tools)</strong> &ndash; A self-contained installer that delivers the ARM cross-compiler (<code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>), the CMake build system, the Ninja build runner, the ST-LINK GDB server (for on-chip debugging), and the STM32CubeProgrammer CLI (for flashing firmware). Every tool required to build and deploy STM32 firmware is bundled in this single package.</li>
-            <li><strong>STM32 VS Code Extension</strong> &ndash; An official ST extension for Visual Studio Code that ties CubeMX and CubeCLT together. It auto-detects CubeMX project files, drives the CMake build through a single button click, and can flash or debug the board directly from the editor.</li>
+            <li><strong>STM32CubeIDE for VS Code</strong> &ndash; ST's official extension <em>pack</em> for Visual Studio Code, and the direct successor to the older &quot;STM32 VS Code Extension.&quot; It auto-detects CubeMX project files, drives the CMake build, and can flash or debug the board directly from the editor. Rather than requiring a separate STM32CubeCLT command-line tools installer, it includes a <strong>Bundle Manager</strong> that automatically downloads the exact ARM cross-compiler (<code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>), CMake, Ninja, and flashing/debugging tools your project needs, an ST-provided debug adapter for ST-LINK and J-Link probes, a <code style="font-family: monospace; color: #273540;">clangd</code>-based C/C++ editor, and a built-in serial terminal &mdash; all as one installable pack.</li>
         </ul>
         <h3>The NUCLEO-L496ZG-P Development Board</h3>
         <p><img src="https://instructure.charlotte.edu/courses/271388/files/33825446/preview" alt="image.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/271388/files/33825446" data-api-returntype="File" /></p>
@@ -37,11 +36,11 @@
         <p>The STM32 HAL (Hardware Abstraction Layer) is a C library generated and maintained by STMicroelectronics. It wraps every on-chip peripheral &mdash; GPIOs, UARTs, SPI buses, DMA controllers, timers, and more &mdash; behind a consistent, device-independent API. This means that code written with <code style="font-family: monospace; color: #273540;">HAL_GPIO_TogglePin()</code> will compile and behave correctly on an L496, an F4, an H7, or any other STM32 device with only minor project-level changes.</p>
         <p>CubeMX generates the HAL initialization code automatically based on your peripheral configuration. Your job as the application developer is to call the HAL functions in the <strong>USER CODE</strong> sections of <code style="font-family: monospace; color: #273540;">main.c</code>. These specially marked sections are preserved every time you regenerate from CubeMX, so you never lose your application code when you change a peripheral setting.</p>
         <h3>CMake Build System</h3>
-        <p>CMake is an industry-standard, cross-platform build system generator. When you select <strong>CMake</strong> as the toolchain in CubeMX's Project Manager, CubeMX outputs a <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> that describes all source files, include paths, compiler flags, and linker scripts for your project. The STM32 VS Code Extension and the cmake-tools extension then read this file to drive the actual compilation with <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>. You do not need to write or edit the CMakeLists.txt by hand.</p>
+        <p>CMake is an industry-standard, cross-platform build system generator. When you select <strong>CMake</strong> as the toolchain in CubeMX's Project Manager, CubeMX outputs a <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code> that describes all source files, include paths, compiler flags, and linker scripts for your project. The STM32CubeIDE for VS Code extension pack (through its bundled Microsoft CMake Tools component) then reads this file to drive the actual compilation with <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code>, using the compiler that the extension's Bundle Manager downloaded for you. You do not need to write or edit the CMakeLists.txt by hand.</p>
         <hr style="margin: 30px 0px; border: 1px solid #cccccc;" />
         <h2><span style="color: #004b87;">Procedure</span></h2>
         <h3>1. Create an STMicroelectronics Account</h3>
-        <p>Downloading STM32CubeMX and STM32CubeCLT requires a free ST account. If you already have one, skip to Step 2.</p>
+        <p>Downloading STM32CubeMX requires a free ST account. If you already have one, skip to Step 2.</p>
         <ol>
             <li>Open a web browser and go to <strong>https://www.st.com</strong>.</li>
             <li>Click the person icon (👤) in the top-right corner of the page, then click <strong>Create an account</strong>.</li>
@@ -60,20 +59,7 @@
             <li>Accept the default installation directory (<code style="font-family: monospace; color: #273540;">C:\ST\STM32CubeMX</code>). Click <strong>Next</strong>, then <strong>Install</strong>. The installation will take about one minute.</li>
             <li>When the installer finishes, leave <strong>Launch STM32CubeMX</strong> unchecked for now and click <strong>Finish</strong>.</li>
         </ol>
-        <h3>3. Download and Install STM32CubeCLT</h3>
-        <p>STM32CubeCLT is the collection of command-line tools that performs the actual work of compiling, linking, and flashing your firmware. It must be installed before the VS Code extension can function.</p>
-        <ol>
-            <li>Navigate to the STM32CubeCLT product page: <strong>https://www.st.com/en/development-tools/stm32cubeclt.html</strong></li>
-            <li>In the <strong>Get Software</strong> section, click <strong>Get latest</strong> next to the Windows installer. Accept the license agreement and download.</li>
-            <li>Locate the file <code style="font-family: monospace; color: #273540;">en.STM32CubeCLT_*.exe</code> in your Downloads folder. Right-click it and select <strong>Run as administrator</strong>. Administrator privileges are required so the installer can add the ST-LINK USB driver to Windows.</li>
-            <li>Click through the setup wizard. Accept the license agreement and use the default installation path, which will be something like <code style="font-family: monospace; color: #273540;">C:\ST\STM32CubeCLT_1.x.x\</code>. <strong>Make note of this exact path</strong> &mdash; you will need to enter it in VS Code later.</li>
-            <li>When prompted about installing the <strong>ST-LINK USB Driver</strong>, click <strong>Yes</strong> or <strong>Install</strong>. This driver is what allows Windows to recognize your NUCLEO board as both a programming interface and a virtual COM port.</li>
-            <li>Complete the installation and click <strong>Finish</strong>. Do not reboot yet if prompted; you can reboot after all tools are installed.</li>
-        </ol>
-        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0;"><strong>What was installed:</strong> Inside <code style="font-family: monospace; color: #273540;">C:\ST\STM32CubeCLT_1.x.x\</code> you will now find sub-folders including <code style="font-family: monospace; color: #273540;">GNU-tools-for-STM32\</code> (containing <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc.exe</code>), <code style="font-family: monospace; color: #273540;">CMake\</code>, <code style="font-family: monospace; color: #273540;">Ninja\</code>, <code style="font-family: monospace; color: #273540;">STLink-gdb-server\</code>, and <code style="font-family: monospace; color: #273540;">STM32CubeProgrammer\</code>. You do not need to configure these paths manually; the STM32 VS Code Extension reads them from the parent directory.</p>
-        </div>
-        <h3>4. Install Visual Studio Code</h3>
+        <h3>3. Install Visual Studio Code</h3>
         <ol>
             <li>Go to <strong>https://code.visualstudio.com/</strong> and click the large blue <strong>Download for Windows</strong> button. This downloads the System Installer (<code style="font-family: monospace; color: #273540;">VSCodeSetup-x64-*.exe</code>).</li>
             <li>Run the installer. When you reach the <strong>Select Additional Tasks</strong> screen, check all of the following boxes:
@@ -87,44 +73,24 @@
             <li>Click <strong>Next</strong>, then <strong>Install</strong>. When the installer finishes, leave <strong>Launch Visual Studio Code</strong> checked and click <strong>Finish</strong>.</li>
             <li>VS Code will open for the first time and may show a welcome tab and theme selection prompts. Close those for now; you will configure it in the next step.</li>
         </ol>
-        <h3>5. Install Required VS Code Extensions</h3>
-        <p>Extensions add language support, build system integration, and hardware debug capability to VS Code. You need to install four extensions. All of them are installed the same way: open the Extensions sidebar by pressing <strong>Ctrl+Shift+X</strong> (or clicking the four-square icon on the left Activity Bar), type the extension name in the search box, and click <strong>Install</strong> on the correct result.</p>
-        <h4>5a. C/C++ Extension Pack</h4>
+        <h3>4. Install the STM32CubeIDE for VS Code Extension Pack</h3>
+        <p>ST's tooling has consolidated into a single extension <em>pack</em> that bundles everything needed to edit, build, flash, and debug STM32 projects. Unlike the previous generation of tools, you do <strong>not</strong> install a separate command-line tools package (STM32CubeCLT) &mdash; the extension pack downloads and manages the compiler, debugger, and programmer for you automatically.</p>
+        <h4>4a. Install the Extension Pack</h4>
         <ol>
-            <li>In the Extensions search box, type: <code style="font-family: monospace; color: #273540;">C/C++ Extension Pack</code></li>
-            <li>Find the result published by <strong>Microsoft</strong> (identifier: <code style="font-family: monospace; color: #273540;">ms-vscode.cpptools-extension-pack</code>). Click <strong>Install</strong>. This pack installs the C/C++ IntelliSense engine, the CMake language extension, and the CMake Tools build-system driver all at once.</li>
+            <li>Open the Extensions sidebar by pressing <strong>Ctrl+Shift+X</strong> (or clicking the four-square icon on the left Activity Bar).</li>
+            <li>In the search box, type: <code style="font-family: monospace; color: #273540;">STM32CubeIDE for Visual Studio Code</code></li>
+            <li>Find the result published by <strong>STMicroelectronics</strong> (identifier: <code style="font-family: monospace; color: #273540;">stmicroelectronics.stm32-vscode-extension</code>). Click <strong>Install</strong>.</li>
+            <li>This is an <em>extension pack</em>, so installing it automatically pulls in everything you need for this lab: <code style="font-family: monospace; color: #273540;">clangd</code> for C/C++ IntelliSense and code navigation, Microsoft's <strong>CMake Tools</strong> for driving the build, the <strong>STM32Cube Core</strong> extension (Bundle Manager, Board Manager, Build Analyzer, and ST's own debug adapter), and a built-in serial terminal. Do <strong>not</strong> separately install the older <code style="font-family: monospace; color: #273540;">C/C++ Extension Pack</code>, <code style="font-family: monospace; color: #273540;">Cortex-Debug</code>, or <code style="font-family: monospace; color: #273540;">Serial Monitor</code> extensions for this lab &mdash; they are no longer required and can conflict with the IntelliSense and debug features this pack provides.</li>
+            <li>After installation, you will see a new <strong>STM32Cube</strong> icon appear in the left Activity Bar of VS Code. This panel hosts the Bundle Manager, Board Manager, and build/flash/debug actions you will use for the rest of this lab.</li>
         </ol>
-        <h4>5b. STM32 VS Code Extension</h4>
+        <h4>4b. Let the Bundle Manager Download the Toolchain</h4>
+        <p>There is no CubeCLT installation path to configure anymore. Instead, the extension's <strong>Bundle Manager</strong> automatically downloads the exact tool versions your project needs &mdash; the ARM GCC compiler, CMake, Ninja, and the debug/flash adapter (which includes STM32CubeProgrammer) &mdash; the first time you open or build an STM32Cube project.</p>
         <ol>
-            <li>In the Extensions search box, type: <code style="font-family: monospace; color: #273540;">STM32 VS Code Extension</code></li>
-            <li>Find the result published by <strong>stmicroelectronics</strong> (identifier: <code style="font-family: monospace; color: #273540;">stmicroelectronics.stm32-vscode-extension</code>). Click <strong>Install</strong>. This is ST's official extension that provides build, flash, and debug commands integrated directly with your CubeMX project and CubeCLT tools.</li>
-            <li>After the extension installs, you will see a new <strong>STM32</strong> icon (an ST logo) appear in the left Activity Bar of VS Code.</li>
+            <li>Click the new <strong>STM32Cube</strong> icon in the Activity Bar to open its panel and confirm you can see the <strong>Bundle Manager</strong> view.</li>
+            <li>You do not need to install anything yet. Once you open your generated project later in this lab (Step 9), VS Code will detect that it needs a compiler and debug toolchain and will prompt you, either through a notification or an entry in the Bundle Manager view, to download the required bundle.</li>
+            <li>When prompted, click <strong>Install</strong> (or <strong>Download</strong>) and let the Bundle Manager fetch the toolchain. This step replaces the old CubeCLT installer entirely and does not require you to know an installation path or edit any VS Code settings.</li>
         </ol>
-        <h4>5c. Cortex-Debug</h4>
-        <ol>
-            <li>In the Extensions search box, type: <code style="font-family: monospace; color: #273540;">Cortex-Debug</code></li>
-            <li>Find the result published by <strong>marus25</strong> (identifier: <code style="font-family: monospace; color: #273540;">marus25.cortex-debug</code>). Click <strong>Install</strong>. Cortex-Debug provides the low-level JTAG/SWD debug adapter support that lets VS Code connect to the STM32's debug port through the on-board ST-LINK.</li>
-        </ol>
-        <h4>5d. Serial Monitor</h4>
-        <ol>
-            <li>In the Extensions search box, type: <code style="font-family: monospace; color: #273540;">Serial Monitor</code></li>
-            <li>Find the result published by <strong>Microsoft</strong> (identifier: <code style="font-family: monospace; color: #273540;">ms-vscode.vscode-serial-monitor</code>). Click <strong>Install</strong>. This extension lets you open a serial terminal to your board's virtual COM port directly inside VS Code without needing an external program like PuTTY.</li>
-        </ol>
-        <h4>5e. Configure the STM32 Extension with the CubeCLT Path</h4>
-        <p>The STM32 extension must know where CubeCLT was installed so it can find the compiler and programmer.</p>
-        <ol>
-            <li>In VS Code, open the Settings editor by pressing <strong>Ctrl+,</strong> (Ctrl and comma).</li>
-            <li>In the Settings search bar at the top, type: <code style="font-family: monospace; color: #273540;">STM32 cubeclt</code></li>
-            <li>You will see an entry labeled <strong>STM32VSCodeExtension: Cube CLT</strong> with a text field below it. Click <strong>Edit in settings.json</strong> or simply type the path directly into the field:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">C:\ST\STM32CubeCLT_1.x.x</pre>
-                Replace <code style="font-family: monospace; color: #273540;">1.x.x</code> with the exact version number in your installation folder. For example, if the folder is named <code style="font-family: monospace; color: #273540;">STM32CubeCLT_1.16.0</code>, enter <code style="font-family: monospace; color: #273540;">C:\ST\STM32CubeCLT_1.16.0</code>.
-            </li>
-            <li>Press <strong>Ctrl+S</strong> to save the settings. Close the Settings tab.</li>
-        </ol>
-        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0;"><strong>Tip:</strong> To find the exact folder name, open <strong>File Explorer</strong> and navigate to <code style="font-family: monospace; color: #273540;">C:\ST\</code>. You will see a folder whose name begins with <code style="font-family: monospace; color: #273540;">STM32CubeCLT_</code>. Copy the full folder name exactly as it appears and paste it after <code style="font-family: monospace; color: #273540;">C:\ST\</code> in the VS Code settings field.</p>
-        </div>
-        <h3>6. Install the STM32CubeL4 Firmware Package</h3>
+        <h3>5. Install the STM32CubeL4 Firmware Package</h3>
         <p>STM32CubeMX needs the device-specific HAL library (the STM32CubeL4 firmware package) to generate correct driver code for the L496 microcontroller. You will install it now through CubeMX's built-in package manager.</p>
         <ol>
             <li>Launch <strong>STM32CubeMX</strong> from the Start menu or the desktop shortcut.</li>
@@ -138,7 +104,7 @@
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0;"><strong>Why is this necessary?</strong> The STM32CubeL4 firmware package contains the HAL source files (<code style="font-family: monospace; color: #273540;">stm32l4xx_hal_gpio.c</code>, <code style="font-family: monospace; color: #273540;">stm32l4xx_hal_uart.c</code>, etc.) and the CMSIS startup files that CubeMX copies into your project. Without this package installed, CubeMX cannot generate a complete, compilable project for L-series devices.</p>
         </div>
-        <h3>7. Create a New STM32CubeMX Project for the NUCLEO-L496ZG-P</h3>
+        <h3>6. Create a New STM32CubeMX Project for the NUCLEO-L496ZG-P</h3>
         <ol>
             <li>In STM32CubeMX, click <strong>ACCESS TO BOARD SELECTOR</strong> on the home screen. (If CubeMX is already open with a project, go to <strong>File &rarr; New Project</strong> and then click the <strong>Board Selector</strong> tab at the top of the dialog.)</li>
             <li>The Board Selector view will open. In the <strong>Commercial Part Number</strong> search field on the left, type exactly:
@@ -149,15 +115,15 @@
             <li>A dialog box will appear asking: <em>"Initialize all peripherals with their default Mode?"</em> <br />Click <strong>Yes</strong>. This is a critical step &mdash; it configures the board's built-in LEDs, user button, and ST-LINK UART connection automatically, matching the physical hardware connections on the PCB.</li>
             <li>CubeMX will switch to the <strong>Pinout &amp; Configuration</strong> view. You will see a rendered die image of the STM32L496 with colored pins indicating which functions are active. Green pins are GPIO outputs (LEDs), a yellow pin is the button input, and blue pins are the USART3 TX and RX lines.</li>
         </ol>
-        <h3>8. Verify Peripheral Configuration in STM32CubeMX</h3>
+        <h3>7. Verify Peripheral Configuration in STM32CubeMX</h3>
         <p>With the board initialized, take a moment to verify the key peripherals are configured correctly before generating code. The board initialization handled most of this automatically.</p>
-        <h4>8a. Verify the User LEDs</h4>
+        <h4>7a. Verify the User LEDs</h4>
         <ol>
             <li>In the Pinout view, locate and click on the GPIO pins that are colored green and labeled LD1, LD2, and LD3. They will each show a mode of <strong>GPIO_Output</strong>. This is correct.</li>
             <li>On the left panel under <strong>Categories</strong>, click <strong>System Core</strong> and then <strong>GPIO</strong>. You will see a table listing all configured GPIO pins. Confirm that entries for LD1, LD2, and LD3 exist with output level set to <strong>Low</strong> and GPIO mode set to <strong>Output Push Pull</strong>. These are your three user LEDs.</li>
             <li>Note the <strong>User Label</strong> column for each LED pin. CubeMX will use these labels (e.g., <code style="font-family: monospace; color: #273540;">LD1</code>, <code style="font-family: monospace; color: #273540;">LD2</code>, <code style="font-family: monospace; color: #273540;">LD3</code>) to generate convenience macros in <code style="font-family: monospace; color: #273540;">main.h</code>. Your application code will use these macros &mdash; for example, <code style="font-family: monospace; color: #273540;">LD1_Pin</code> and <code style="font-family: monospace; color: #273540;">LD1_GPIO_Port</code> &mdash; rather than raw register names. This makes your code readable and portable.</li>
         </ol>
-        <h4>8b. Verify USART3</h4>
+        <h4>7b. Verify USART3</h4>
         <ol>
             <li>On the left panel under <strong>Categories</strong>, click <strong>Connectivity</strong> and then <strong>USART3</strong>.</li>
             <li>Confirm the following settings are present (they should be set by the board default):
@@ -171,13 +137,13 @@
                 These settings match the ST-LINK virtual COM port's default configuration and must not be changed.
             </li>
         </ol>
-        <h4>8c. Review the Clock Configuration (Optional but Recommended)</h4>
+        <h4>7c. Review the Clock Configuration (Optional but Recommended)</h4>
         <ol>
             <li>Click the <strong>Clock Configuration</strong> tab at the top of the CubeMX window.</li>
             <li>You will see a block diagram of the STM32L496's clock tree. The board initialization will have configured a clock source and PLL settings. Verify that <strong>HCLK</strong> (the main CPU and bus clock) shows a value greater than 4 MHz. A value of <strong>80 MHz</strong> is the maximum for the L496 and is ideal for this lab.</li>
             <li>If HCLK is at a low value (e.g., 4 MHz), consult your instructor. The board default should configure a higher value, but firmware behavior for USART baud rate depends on the actual clock frequency.</li>
         </ol>
-        <h3>9. Configure the Project Manager and Generate Code</h3>
+        <h3>8. Configure the Project Manager and Generate Code</h3>
         <ol>
             <li>Click the <strong>Project Manager</strong> tab at the top of the CubeMX window.</li>
             <li>In the <strong>Project</strong> sub-tab (selected by default on the left), fill in the following:
@@ -185,7 +151,7 @@
                     <li><strong>Project Name:</strong> Enter <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code></li>
                     <li><strong>Project Location:</strong> Click <strong>Browse</strong> and choose a folder where you want to save your STM32 projects. A dedicated folder such as <code style="font-family: monospace; color: #273540;">C:\Users\YourName\STM32Projects\</code> is a good choice. Avoid paths with spaces or special characters &mdash; they can cause build failures.</li>
                     <li><strong>Application Structure:</strong> Leave this set to <strong>Advanced</strong>. The Advanced structure separates the auto-generated driver code from your application code, which keeps the project organized.</li>
-                    <li><strong>Toolchain / IDE:</strong> Click the dropdown and select <strong>CMake</strong>. This is the most important setting. Do not select STM32CubeIDE, Makefile, or any other option. If CMake is not selected, the VS Code extension will not be able to build the project.</li>
+                    <li><strong>Toolchain / IDE:</strong> Click the dropdown and select <strong>CMake</strong>. This is the most important setting. Do not select STM32CubeIDE, Makefile, or any other option. If CMake is not selected, the STM32CubeIDE for VS Code extension will not be able to build the project.</li>
                 </ul>
             </li>
             <li>Click the <strong>Code Generator</strong> sub-tab on the left side of the Project Manager. Under <strong>STM32Cube Firmware Library Package</strong>, make sure <strong>Copy only the necessary library files</strong> is selected. This keeps the generated project folder compact by only copying the HAL source files that your project actually uses.</li>
@@ -211,28 +177,25 @@
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0;"><strong>The .ioc File:</strong> The <code style="font-family: monospace; color: #273540;">.ioc</code> file is your CubeMX project file. If you need to change a peripheral setting in the future, open this file with STM32CubeMX, make your changes in the GUI, and click Generate Code again. All <code style="font-family: monospace; color: #273540;">/* USER CODE BEGIN */</code> &hellip; <code style="font-family: monospace; color: #273540;">/* USER CODE END */</code> sections in your source files will be preserved during regeneration. Never place application code outside of these markers.</p>
         </div>
-        <h3>10. Open the Project in Visual Studio Code</h3>
+        <h3>9. Open the Project in Visual Studio Code</h3>
         <ol>
             <li>In Windows File Explorer, right-click on the <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code> folder (the root folder that contains <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>) and select <strong>Open with Code</strong>. This opens the entire project folder as the VS Code workspace.</li>
             <li>If <strong>Open with Code</strong> does not appear in the right-click menu, open VS Code manually and then go to <strong>File &rarr; Open Folder&hellip;</strong> and navigate to your <code style="font-family: monospace; color: #273540;">Lab1_NUCLEO_L496</code> folder.</li>
             <li>VS Code may display a dialog: <em>"Do you trust the authors of the files in this folder?"</em> Click <strong>Yes, I trust the authors</strong>. This enables all extension features for this folder.</li>
-            <li>After a few moments, VS Code's extensions will begin processing the project. You will see activity in the blue status bar at the bottom of the window. The STM32 extension will detect the <code style="font-family: monospace; color: #273540;">.ioc</code> file and activate its features. The CMake Tools extension will automatically locate the <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>.</li>
-            <li>At the bottom status bar in VS Code, look for a section that shows the CMake build type, such as <strong>[Debug]</strong>. Click on it. A dropdown will appear at the top of the screen showing available CMake kits. A <strong>kit</strong> is a specific compiler toolchain.</li>
-            <li>In the kit list, look for an entry containing <code style="font-family: monospace; color: #273540;">arm-none-eabi</code>. It will show the full path from your CubeCLT installation, such as:
-                <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">GCC arm-none-eabi - C:\ST\STM32CubeCLT_1.x.x\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe</pre>
-                Click on this entry to select it as the active kit. If you do not see this entry, expand the <strong>[Scan for Kits]</strong> option and allow VS Code to search your system.
-            </li>
-            <li>After selecting the kit, CMake Tools will configure the project. You will see output in the <strong>Output</strong> panel at the bottom (select the <strong>CMake/Build</strong> tab from the dropdown in that panel). The output will end with:
+            <li>The STM32CubeIDE for VS Code extension pack runs a <strong>Cube Discovery</strong> process that automatically detects the <code style="font-family: monospace; color: #273540;">.ioc</code> file and the generated <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>, and recognizes the folder as an STM32Cube project. You will see activity in the blue status bar and typically a notification confirming the project was recognized. The bundled CMake Tools extension will automatically locate <code style="font-family: monospace; color: #273540;">CMakeLists.txt</code>.</li>
+            <li>Because this is likely the first STM32Cube project you have opened on this machine, the extension will notify you that it needs to download a matching toolchain bundle (the ARM GCC compiler, CMake, Ninja, and the debug/flash adapter). Click <strong>Install</strong> (or <strong>Download</strong>) on the notification, or open the <strong>STM32Cube</strong> panel's <strong>Bundle Manager</strong> view and install the bundle it recommends for this project. This one-time download replaces the old manual CubeCLT installation and path configuration entirely.</li>
+            <li>Once the bundle finishes downloading, CMake Tools automatically configures the project using the toolchain the Bundle Manager just installed &mdash; you do not need to manually browse for or select a compiler path. You will see output in the <strong>Output</strong> panel at the bottom (select the <strong>CMake/Build</strong> tab from the dropdown in that panel) ending with:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">-- Configuring done
 -- Build files have been written to: ...</pre>
-                If you see errors at this stage, the most common cause is an incorrect CubeCLT path in the VS Code settings (revisit Step 5e).
+                If configuration does not start automatically, open the Command Palette (<strong>Ctrl+Shift+P</strong>) and run <code style="font-family: monospace; color: #273540;">CMake: Configure</code>.
             </li>
+            <li>If you see errors at this stage, the most common cause is a bundle download that has not finished yet or failed &mdash; check the Bundle Manager view for progress or error messages, and confirm you have an active internet connection.</li>
         </ol>
-        <h3>11. Build the Default Project</h3>
+        <h3>10. Build the Default Project</h3>
         <p>Before adding any application code, verify that the unmodified, generated project compiles successfully. This confirms your toolchain is working end-to-end.</p>
         <ol>
-            <li>Click the <strong>STM32</strong> icon in the left Activity Bar to open the STM32 extension panel. You will see sections for <strong>Build</strong>, <strong>Flash</strong>, and <strong>Debug</strong>, each with action buttons.</li>
-            <li>Click the <strong>Build</strong> button (the hammer icon) in the STM32 panel. Alternatively, you can press <strong>Ctrl+Shift+P</strong> to open the Command Palette, type <code style="font-family: monospace; color: #273540;">STM32: Build</code>, and press <strong>Enter</strong>.</li>
+            <li>Click the <strong>STM32Cube</strong> icon in the left Activity Bar to open its panel. You will see project actions including <strong>Build</strong>, <strong>Flash</strong>, and <strong>Debug</strong>.</li>
+            <li>Click the <strong>Build</strong> action in the STM32Cube panel. Alternatively, you can press <strong>Ctrl+Shift+P</strong> to open the Command Palette, type <code style="font-family: monospace; color: #273540;">CMake: Build</code>, and press <strong>Enter</strong>.</li>
             <li>The <strong>Terminal</strong> panel at the bottom of VS Code will open and display the build output. You will see CMake invoking <code style="font-family: monospace; color: #273540;">arm-none-eabi-gcc</code> to compile each source file, followed by a linker step. The build should complete in 15&ndash;60 seconds depending on your machine speed.</li>
             <li>A successful build ends with a message similar to:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">[100%] Linking C executable Lab1_NUCLEO_L496.elf
@@ -243,13 +206,13 @@
             </li>
             <li>If the build produces errors, the most common causes are:
                 <ul>
-                    <li>Wrong or missing CMake kit (arm-none-eabi-gcc not selected &mdash; repeat Step 10.5&ndash;6).</li>
+                    <li>The toolchain bundle has not finished downloading &mdash; check the Bundle Manager view in the STM32Cube panel for progress or errors (repeat Step 9.5&ndash;6).</li>
                     <li>CMake configuration not completed &mdash; check that the Output panel showed "Configuring done".</li>
-                    <li>Incorrect CubeCLT path in VS Code settings &mdash; verify Step 5e.</li>
+                    <li>A blocked or interrupted network connection prevented the Bundle Manager from downloading the compiler.</li>
                 </ul>
             </li>
         </ol>
-        <h3>12. Write the Verification Firmware</h3>
+        <h3>11. Write the Verification Firmware</h3>
         <p>Now you will modify <code style="font-family: monospace; color: #273540;">main.c</code> to add a blinking LED and a UART status stream. Every edit you make <strong>must</strong> be placed inside the designated <code style="font-family: monospace; color: #273540;">/* USER CODE BEGIN */</code> and <code style="font-family: monospace; color: #273540;">/* USER CODE END */</code> markers. Code outside those markers is owned by CubeMX and will be deleted the next time you regenerate.</p>
         <ol>
             <li>In the VS Code Explorer panel (left sidebar), expand <strong>Core &rarr; Src</strong> and click on <strong>main.c</strong> to open it.</li>
@@ -327,9 +290,9 @@ HAL_UART_Transmit(&amp;huart3, (uint8_t *)startup_msg,
                 <li><code style="font-family: monospace; color: #273540;">HAL_Delay(1000)</code> &mdash; Puts the processor into a busy-wait loop for exactly 1000 milliseconds, producing a 1 Hz LED toggle rate and one UART message per second.</li>
             </ul>
         </div>
-        <h3>13. Rebuild the Project</h3>
+        <h3>12. Rebuild the Project</h3>
         <ol>
-            <li>Click the <strong>Build</strong> button in the STM32 extension panel, or press <strong>Ctrl+Shift+B</strong>.</li>
+            <li>Click the <strong>Build</strong> action in the STM32Cube panel, or press <strong>Ctrl+Shift+B</strong>.</li>
             <li>Confirm the build completes with <strong>0 errors</strong>. If you see errors, carefully compare your code to the snippets above, paying close attention to:
                 <ul>
                     <li>Correct placement of code inside the USER CODE markers (not before <code style="font-family: monospace; color: #273540;">BEGIN</code> or after <code style="font-family: monospace; color: #273540;">END</code>).</li>
@@ -339,19 +302,19 @@ HAL_UART_Transmit(&amp;huart3, (uint8_t *)startup_msg,
                 </ul>
             </li>
         </ol>
-        <h3>14. Connect the NUCLEO-L496ZG-P and Install the Driver</h3>
+        <h3>13. Connect the NUCLEO-L496ZG-P and Install the Driver</h3>
         <ol>
             <li>Plug one end of your Micro-USB cable into the port on the NUCLEO board labeled <strong>USB ST-LINK (CN1)</strong>. This connector is near the ST-LINK chip at the top edge of the board (the portion of the board above the thin blue line separating the ST-LINK section from the target MCU section).</li>
             <li>Plug the other end of the cable into any USB port on your laptop.</li>
             <li>The green power LED (<strong>LD3 PWR</strong>, not to be confused with the user LD3) near the USB connector on the board should illuminate immediately, confirming the board is receiving power.</li>
-            <li>Windows will detect the new device. A notification may appear saying "Setting up a device." Wait until this completes. Because you installed STM32CubeCLT earlier (which included the ST-LINK driver), the board should be recognized without any additional driver installation.</li>
-            <li>To confirm the driver is installed correctly, right-click the <strong>Start</strong> button and select <strong>Device Manager</strong>. Expand the <strong>Ports (COM &amp; LPT)</strong> section. You should see an entry labeled <em>STMicroelectronics STLink Virtual COM Port (COMx)</em> where <em>x</em> is a number such as 3, 5, or 7. Make note of this COM port number &mdash; you will need it for the serial terminal in Step 16.</li>
-            <li>In Device Manager, also expand <strong>Universal Serial Bus devices</strong> (or <strong>Other devices</strong>). You should see <em>ST-LINK Debug</em> listed without a yellow warning icon. If you see a yellow exclamation mark, the ST-LINK driver did not install correctly. In that case, right-click the entry, select <strong>Update driver &rarr; Browse my computer &rarr; Let me pick</strong>, and navigate to <code style="font-family: monospace; color: #273540;">C:\ST\STM32CubeCLT_1.x.x\STLink-gdb-server\bin\</code> to locate and install the driver manually.</li>
+            <li>Windows will detect the new device. A notification may appear saying "Setting up a device." Wait until this completes. The ST-LINK USB driver is installed automatically the first time the STM32CubeIDE for VS Code extension's Bundle Manager downloads the debug/flash bundle (Step 9); if you completed that step, the board should be recognized without any additional driver installation.</li>
+            <li>To confirm the driver is installed correctly, right-click the <strong>Start</strong> button and select <strong>Device Manager</strong>. Expand the <strong>Ports (COM &amp; LPT)</strong> section. You should see an entry labeled <em>STMicroelectronics STLink Virtual COM Port (COMx)</em> where <em>x</em> is a number such as 3, 5, or 7. Make note of this COM port number &mdash; you will need it for the serial terminal in Step 15.</li>
+            <li>In Device Manager, also expand <strong>Universal Serial Bus devices</strong> (or <strong>Other devices</strong>). You should see <em>ST-LINK Debug</em> listed without a yellow warning icon. If you see a yellow exclamation mark, open the <strong>STM32Cube</strong> panel's <strong>Board Manager</strong> view, which can detect the connected ST-LINK and reinstall or update its driver and firmware. If the Board Manager cannot resolve it, download the standalone ST-LINK USB driver directly from ST's website and install it manually.</li>
         </ol>
-        <h3>15. Flash the Firmware to the Board</h3>
+        <h3>14. Flash the Firmware to the Board</h3>
         <ol>
-            <li>In VS Code's STM32 extension panel, locate the <strong>Flash</strong> section. Click the <strong>Flash</strong> button (the lightning bolt icon). Alternatively, open the Command Palette with <strong>Ctrl+Shift+P</strong>, type <code style="font-family: monospace; color: #273540;">STM32: Flash</code>, and press Enter.</li>
-            <li>The STM32 extension will invoke the STM32CubeProgrammer CLI to communicate with the ST-LINK on your board. The Terminal panel will display progress similar to:
+            <li>In VS Code's <strong>STM32Cube</strong> panel, locate the <strong>Flash</strong> action and click it. Alternatively, open the Command Palette with <strong>Ctrl+Shift+P</strong> and search for the STM32Cube flash command.</li>
+            <li>The extension will invoke STM32CubeProgrammer &mdash; downloaded automatically by the Bundle Manager along with the rest of the debug/flash bundle &mdash; to communicate with the ST-LINK on your board. The Terminal panel will display progress similar to:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">      -------------------------------------------------------------------
                         STM32CubeProgrammer v2.x.x
       -------------------------------------------------------------------
@@ -398,14 +361,14 @@ Application running successfully.</pre>
                 </ul>
             </li>
         </ol>
-        <h3>16. Verify Output with the Serial Monitor</h3>
-        <p>With the firmware running and LD1 blinking, the final step is to open a serial terminal and read the UART messages the board is sending. You will use the Serial Monitor extension you installed earlier.</p>
+        <h3>15. Verify Output with the Built-in Serial Terminal</h3>
+        <p>With the firmware running and LD1 blinking, the final step is to open a serial terminal and read the UART messages the board is sending. The STM32CubeIDE for VS Code extension pack includes a built-in serial terminal, so no additional Serial Monitor extension is required.</p>
         <ol>
-            <li>In VS Code, open the Command Palette (<strong>Ctrl+Shift+P</strong>) and type <code style="font-family: monospace; color: #273540;">Serial Monitor: Focus on Serial Monitor View</code>. Press Enter. A <strong>Serial Monitor</strong> panel will appear at the bottom of VS Code.</li>
-            <li>In the Serial Monitor panel's toolbar, click the <strong>Port</strong> dropdown and select the COM port you identified in Step 14.5 (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>).</li>
+            <li>Open the <strong>STM32Cube</strong> panel in the Activity Bar and select its <strong>Serial Terminal</strong> view. Alternatively, open the Command Palette (<strong>Ctrl+Shift+P</strong>) and search for the STM32Cube serial terminal command. A serial terminal panel will appear at the bottom of VS Code.</li>
+            <li>In the serial terminal's toolbar, click the <strong>Port</strong> dropdown and select the COM port you identified in Step 13 (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>).</li>
             <li>Click the <strong>Baud rate</strong> dropdown and select <code style="font-family: monospace; color: #273540;">115200</code>.</li>
-            <li>Click the <strong>Start Monitoring</strong> (play ▶) button in the Serial Monitor toolbar. The monitor will open the port and begin listening.</li>
-            <li>Within one second, you should see the startup banner appear in the monitor:
+            <li>Click the <strong>Connect</strong> / <strong>Start</strong> (play &#9658;) button in the serial terminal toolbar. The terminal will open the port and begin listening.</li>
+            <li>Within one second, you should see the startup banner appear in the terminal:
                 <pre style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">==============================
   ECGR-4101 Lab 1 Verification
   NUCLEO-L496ZG-P Ready
@@ -422,14 +385,14 @@ Lab 1 OK  |  t =    3 s  |  LD1 = ON
                     <li>Verify you have selected the correct COM port. In Device Manager under <strong>Ports (COM &amp; LPT)</strong>, the ST-LINK Virtual COM port will disappear when you unplug the board and reappear when you plug it back in &mdash; use this to identify the correct port number unambiguously.</li>
                     <li>Confirm the baud rate is <strong>115200</strong>. Mismatched baud rates produce garbage characters or no output at all.</li>
                     <li>Press the black RESET button on the NUCLEO board to force the startup message to transmit again while the terminal is open.</li>
-                    <li>Confirm the firmware was flashed successfully by observing the blinking LED. If the LED is not blinking, the flash step may not have completed &mdash; redo Step 15.</li>
+                    <li>Confirm the firmware was flashed successfully by observing the blinking LED. If the LED is not blinking, the flash step may not have completed &mdash; redo Step 14.</li>
                 </ul>
             </li>
         </ol>
         <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0;"><strong>Alternative Serial Terminal &mdash; PuTTY:</strong> If the VS Code Serial Monitor extension is not working, you can use PuTTY (download from <strong>https://www.putty.org/</strong>). In PuTTY's configuration dialog, select <strong>Connection type: Serial</strong>, set <strong>Serial line</strong> to your COM port (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>), set <strong>Speed</strong> to <code style="font-family: monospace; color: #273540;">115200</code>, then click <strong>Open</strong>. Press the RESET button on the board to trigger the startup banner if PuTTY was already open when you flashed.</p>
+            <p style="margin: 0;"><strong>Alternative Serial Terminal &mdash; PuTTY:</strong> If the built-in serial terminal is not working, you can use PuTTY (download from <strong>https://www.putty.org/</strong>). In PuTTY's configuration dialog, select <strong>Connection type: Serial</strong>, set <strong>Serial line</strong> to your COM port (e.g., <code style="font-family: monospace; color: #273540;">COM5</code>), set <strong>Speed</strong> to <code style="font-family: monospace; color: #273540;">115200</code>, then click <strong>Open</strong>. Press the RESET button on the board to trigger the startup banner if PuTTY was already open when you flashed.</p>
         </div>
-        <h3>17. Checkpoint: Exploring the Generated HAL Code</h3>
+        <h3>16. Checkpoint: Exploring the Generated HAL Code</h3>
         <p>Before finishing the lab, spend a few minutes exploring the code CubeMX generated on your behalf. Understanding this structure is foundational to all future labs in this course.</p>
         <ol>
             <li>In the VS Code Explorer, open <strong>Core &rarr; Inc &rarr; main.h</strong>. Scroll to the section labeled <em>Exported pins</em> or search for the text <code style="font-family: monospace; color: #273540;">LD1_Pin</code>. You will see the actual hardware pin assignment, for example:
