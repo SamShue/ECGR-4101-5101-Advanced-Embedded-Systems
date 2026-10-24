@@ -392,3 +392,61 @@ Lab3_Application/
 
 The full path to this `.bin` file is what your Python application will open in binary mode, read, and transmit byte by byte over the serial connection you opened in the previous step - exactly the process described all the way back in the Overview.
 
+# Project Requirements
+
+Everything up to this point has been scaffolding: both projects build, the linker scripts know about each other's flash region, and your laptop can open a serial connection to the board. What remains is the actual bootloader behavior described throughout the Background section. You will implement this yourself, in the `USER CODE` sections of the generated bootloader project and in your own Python script. The guidelines below describe *what* each piece must accomplish and *what to consider* while building it - they are intentionally not step-by-step instructions, since working out the details (and your reasoning for them) is the point of the lab.
+
+Your completed lab should satisfy the following three required components.
+
+## Requirement 1: Open the USB Port and Enter Update Mode
+
+The bootloader must initialize the USB CDC stack so that the board enumerates as a virtual COM port, as described in The USB Peripheral section, and it must give the Python application a way to actually reach it with new firmware.
+
+Think through the following as you design this piece:
+
+- CubeMX already generated the initialization call for the USB device stack - your job is to decide what the bootloader *does* with that connection once it's active, not to re-implement enumeration.
+- A bootloader that unconditionally waits forever for USB data would never be able to launch an already-installed application. Decide on a condition that tells the bootloader "a new image is coming" versus "just launch the existing application" - for example, a button held at startup, a timeout window after reset, or a flag left in memory by the application. Any reasonable, clearly-documented approach is acceptable.
+- Figure out how your bootloader will know incoming data has *started* and, more importantly, when it has *ended*. The USB CDC driver will hand you bytes as they arrive (either through a receive callback or by polling a buffer) - you need a plan for recognizing the end of the transfer so the bootloader doesn't sit waiting for bytes that will never come. A length prefix, a sentinel value, and a timeout are all reasonable options; a solution that always assumes a fixed image size is not.
+
+## Requirement 2: Overwrite the Application Firmware
+
+Once bytes are arriving over USB, the bootloader must turn them into a correctly programmed application image at `0x08010000`, using the concepts from Overwriting the Application Flash.
+
+Things you'll need to work out:
+
+- The application's flash region must be erased before any of it is programmed. Determine how many flash pages that region spans (check the page size for this device family in the reference manual) and erase exactly those pages - no more, no fewer.
+- Flash can only be programmed in aligned double-word (8-byte) chunks, but USB delivers bytes one (or a few) at a time. You will need a small RAM buffer that accumulates incoming bytes and triggers a flash program operation only once a full double word is ready.
+- Decide what happens to the "leftover" bytes at the end of the file if the total size isn't an exact multiple of 8 - you still need to get every byte of the application into flash correctly.
+- Remember to unlock the flash controller before erasing/programming and lock it again afterward, and make sure you are only ever erasing or programming the *application's* region, never the bootloader's own.
+- Once every byte has been written, the bootloader has to actually hand off control: relocate the vector table with VTOR to the application's base address, reset the stack pointer using the application's initial MSP value, and branch to the application's reset handler - mirroring the startup sequence described in What Happens on Startup and Relocating the Interrupt Vector Table.
+
+## Requirement 3: Transmit the Binary File from Python
+
+Your Python script is the host-side half of this exchange. At minimum, it needs to:
+
+- Open the serial port associated with the bootloader's CDC connection (the same one you tested in Open a Serial Connection to the Bootloader).
+- Open the compiled application's `.bin` file in binary mode and transmit its contents over that connection.
+- Communicate whatever "start" and "end" signaling your bootloader expects from Requirement 1 - for example, sending the file size up front if your bootloader is waiting for a length, or writing a defined sentinel sequence once the file has been fully sent.
+
+Keep in mind that flash programming takes real time and USB transfers can arrive faster than the bootloader can consume them. If you send the entire file as one large write, consider whether your bootloader's receive buffer can keep up, and whether you need to send the data in smaller pieces with some form of pacing between them.
+
+## Success Criteria
+
+At minimum, you should be able to: flash the bootloader, build the application project, trigger update mode, run your Python script against the correct `.bin` file, and then observe the application running on the board afterward (for example, via its LED or UART behavior from Lab 1) - without reprogramming the board through the ST-LINK a second time. If you modify the application code and rebuild it, a second run of your Python script should update the board to reflect those changes.
+
+# Bonus Objectives
+
+The requirements above are sufficient to complete the lab. If you'd like an extra challenge, pick one (or more) of the following. Each one builds directly on the pipeline you already have working, but asks you to question whether "it works" also means "it works correctly and safely" - which is a real concern for firmware updates delivered in the field.
+
+### Bonus A: Encrypt the Firmware Image
+
+Right now, anyone capturing the USB traffic between your laptop and the board could read out your entire application image in plain text - and worse, nothing stops a malicious party from sending their own unsigned binary to the bootloader. Modify your Python script to encrypt the `.bin` file with a symmetric cipher before transmitting it (a well-supported library such as Python's `cryptography` package is a reasonable choice), and modify the bootloader to decrypt each block before it is written to flash. Think about where the key lives (a bootloader built once to be deployed to many devices typically has it compiled in, which is itself a limitation worth noting in your writeup), and about how the cipher's block size interacts with the flash controller's double-word programming granularity.
+
+### Bonus B: Verify the Firmware with a CRC
+
+A transfer can be silently corrupted - a dropped byte, electrical noise, or a bug in your buffering logic could all leave the application's flash region in a bad state, and right now the bootloader would jump to it anyway. Have your Python script compute a checksum (CRC32 is a common choice) over the `.bin` file and send it to the bootloader along with the data. After programming finishes, have the bootloader recompute the checksum over what it just wrote to flash - either in software or using the microcontroller's built-in CRC peripheral - and only jump to the application if the two values match. Decide what the bootloader should do instead if they don't match (for example, refusing to launch and signaling the failure with an LED pattern).
+
+### Bonus C: Make the Transfer Reliable
+
+USB CDC over a cable is fairly reliable, but the lab's simple "just stream the bytes" protocol has no way to recover if something goes wrong mid-transfer. Design a small packet-based protocol instead: break the binary into fixed-size chunks, have the bootloader acknowledge (or reject) each chunk as it arrives, and have the Python script retry a chunk if it doesn't receive an acknowledgment. This mirrors the kind of flow control that real-world firmware update protocols rely on, and it's good practice for thinking about communication protocols as something more than "send bytes and hope."
+
