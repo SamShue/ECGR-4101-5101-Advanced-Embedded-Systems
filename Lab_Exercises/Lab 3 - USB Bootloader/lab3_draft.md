@@ -4,7 +4,7 @@ In this lab, we will use the on-board USB peripheral to receive data and perform
 
 # Required Materials
 
-- NUCLEO-L496ZG-P development board (same board used in Lab 1)
+- NUCLEO-L496ZG-P development board
 - Two USB Micro-B cables - one connects the ST-LINK programmer (used to load the bootloader itself), and the other connects to the board's USB OTG FS port (used by the bootloader to receive the application firmware)
 - Laptop with Python development tools installed
 
@@ -286,11 +286,11 @@ Everything we discussed in the Background section was conceptual - two programs,
 
 ## 1. Create the Bootloader Project
 
-The bootloader needs its own CubeMX project because it is its own program, with its own `main()`, its own vector table, and (as we'll set up in a moment) its own dedicated slice of flash. Follow the same CubeMX workflow you used in Lab 1:
+The bootloader needs its own CubeMX project because it is its own program, with its own `main()`, its own vector table, and (as we'll set up in a moment) its own dedicated slice of flash. Follow the same CubeMX workflow:
 
-1. Open **STM32CubeMX** and use the **Board Selector** to search for and select the **NUCLEO-L496ZG-P**, just as you did in Lab 1.
+1. Open **STM32CubeMX** and use the **Board Selector** to search for and select the **NUCLEO-L496ZG-P**.
 2. Click **Start Project**, and when prompted to initialize all peripherals with their default mode, click **Yes**. This gives you the same baseline LED, button, and ST-LINK UART configuration as before.
-3. Before moving to the Project Manager tab, follow the steps below to enable the USB peripheral - this is the one configuration decision that differs from Lab 1.
+3. Before moving to the Project Manager tab, follow the steps below to enable the USB peripheral.
 
 ### Enabling the USB Peripheral and CDC Class
 
@@ -303,7 +303,7 @@ Recall from The USB Peripheral section that our bootloader needs to enumerate as
 5. Click over to the **Clock Configuration** tab. The USB peripheral requires a precise 48 MHz clock input, and enabling it will sometimes cause CubeMX to flag part of the clock tree in red. If this happens, click the **Resolve Clock Issues** button that appears, and CubeMX will automatically adjust the clock tree for you.
 6. Return to the **Pinout & Configuration** view before continuing to the Project Manager tab.
 
-With USB enabled, continue exactly as you did in Lab 1: open the **Project Manager** tab, give the project a name such as `Lab3_Bootloader`, choose a save location, leave **Application Structure** set to **Advanced**, and set **Toolchain / IDE** to **CMake**. Click **GENERATE CODE**, then open the generated folder in VS Code the same way you did in Lab 1.
+With USB enabled, open the **Project Manager** tab, give the project a name such as `Lab3_Bootloader`, choose a save location, leave **Application Structure** set to **Advanced**, and set **Toolchain / IDE** to **CMake**. Click **GENERATE CODE**, then open the generated folder.
 
 ## 2. Write the Bootloader Skeleton
 
@@ -350,11 +350,9 @@ int main(void)
 }
 ```
 
-> **Note:** Double-check `B1_Pin` and `B1_GPIO_Port` against your own project's `main.h` - these are the standard CubeMX names for the Nucleo's User button (B1, on PC13), but confirm them the same way you confirmed `LD1_Pin` back in Lab 1.
-
 ## 3. Create the Application Project
 
-The application project is built the same way, but without any of the USB configuration above - in this lab, only the bootloader talks to the PC over USB. Repeat the same board-selector and default-peripheral steps as Lab 1, then name the project something like `Lab3_Application` in the Project Manager tab, keep **Advanced** structure and **CMake** toolchain, and generate the code.
+The application project is built the same way, but without any of the USB configuration above - in this lab, only the bootloader talks to the PC over USB. Repeat the same board-selector and use default-peripheral configurations, then name the project something like `Lab3_Application` in the Project Manager tab, keep **Advanced** structure and **CMake** toolchain, and generate the code.
 
 At this point you should have two separate project folders on disk, each with its own `.ioc` file, `CMakeLists.txt`, and `Core/` folder - completely independent of one another, just like the bootloader and application are independent programs on the microcontroller.
 
@@ -421,13 +419,11 @@ void Error_Handler(void)
 }
 ```
 
-This pulls in `LD1_Pin` and `LD1_GPIO_Port` from `main.h` (the same macros you located back in Lab 1), so there's nothing else to configure - it builds and runs entirely on its own, with no UART or button handling to get in the way of the one thing this test application needs to do.
-
-> **Note:** `__HAL_RCC_GPIOD_CLK_ENABLE()` assumes LD1 lives on **GPIOD**, which is correct for the NUCLEO-L496ZG-P per Lab 1. If you open `main.h` and find `LD1_GPIO_Port` defined as a different port letter, change this one line to match (for example, `__HAL_RCC_GPIOB_CLK_ENABLE()` for GPIOB).
+This pulls in `LD1_Pin` and `LD1_GPIO_Port` from `main.h`, so there's nothing else to configure - it builds and runs entirely on its own, with no UART or button handling to get in the way of the one thing this test application needs to do.
 
 > **Note:** Because this replaces the whole file rather than living inside the `USER CODE` markers CubeMX normally preserves, regenerating code from CubeMX after this point will overwrite it. If that happens, just paste this same file back in.
 
-Build the project once with `FAST_BLINK` set to `0` and flash it with the ST-LINK (exactly as you did in Lab 1) so the board starts out running a known-good application with a slow, once-per-second blink. Later, when you are ready to test your bootloader, change `FAST_BLINK` to `1`, rebuild, and use the resulting `.bin` file as the "new" firmware you transmit over USB - a correct update should be immediately obvious from the LED switching to a fast blink, with no need to inspect memory or attach a debugger to confirm it worked.
+Build the project once with `FAST_BLINK` set to `0` and flash it with the ST-LINK so the board starts out running a known-good application with a slow, once-per-second blink. Later, when you are ready to test your bootloader, change `FAST_BLINK` to `1`, rebuild, and use the resulting `.bin` file as the "new" firmware you transmit over USB - a correct update should be immediately obvious from the LED switching to a fast blink, with no need to inspect memory or attach a debugger to confirm it worked.
 
 ## 5. Modify the Linker Scripts to Share Flash
 
@@ -515,7 +511,7 @@ This is the same connection you will use later in the lab to actually send the b
 
 ## 8. Locate the Compiled Application Binary
 
-The file your Python application needs to send is produced automatically every time you build the **application** project - you do not need to run any extra tools to create it. When you click **Build** in the STM32Cube panel (the same action you used in Lab 1), CubeMX's generated CMake project compiles your code into an `.elf` file as before, but it also automatically runs a post-build step that extracts a raw, binary copy of your program into a separate `.bin` file alongside it.
+The file your Python application needs to send is produced automatically every time you build the **application** project - you do not need to run any extra tools to create it. When you click **Build** in the STM32Cube panel, CubeMX's generated CMake project compiles your code into an `.elf` file as before, but it also automatically runs a post-build step that extracts a raw, binary copy of your program into a separate `.bin` file alongside it.
 
 This distinction matters: the `.elf` file includes debugging information and symbol tables that are useful to your development tools, but are not part of the actual program. The `.bin` file is a raw, byte-for-byte image of exactly what should be written into flash - which is why it, and not the `.elf`, is the file your bootloader and Python application will work with.
 
@@ -573,18 +569,11 @@ Keep in mind that flash programming takes real time and USB transfers can arrive
 
 ## Requirement 4: Transition to the Application via the User Button
 
-The Nucleo board's onboard User button (the same blue button you used in Lab 1) must serve as the explicit control for leaving the bootloader and launching the application. While the bootloader is running and waiting (per Requirement 1), pressing this button should cause it to perform the same vector-table relocation, stack-pointer reset, and jump to the application's reset handler described in Requirement 2 - without requiring a new firmware image to be sent first.
-
-Think through the following as you design this piece:
-
-- Reuse the GPIO configuration CubeMX already generated for the User button in Lab 1 - you are just reading its state (or handling its interrupt) rather than toggling an LED with it this time. Either polling the pin or wiring up an EXTI interrupt is acceptable, as long as a press reliably triggers the transition.
-- Pressing the button should only ever hand off control to the *existing* application image already sitting in flash - it must never itself erase or program anything. Writing a new image is strictly the job of Requirements 1 and 2; this requirement is only about handing off control afterward.
-- Consider what should happen if the button is pressed before the application region has ever been programmed - jumping into erased flash (which reads back as `0xFF`) will fault. You don't need to build an elaborate recovery mechanism for this case, but you should think through how the board behaves and be able to explain the assumption you're making.
-- This also gives you a convenient way to test Requirement 2 in isolation: run your Python transfer, then press the button to confirm the new application launches, rather than relying on an automatic jump the instant the transfer finishes.
+The Nucleo board's onboard User button must serve as the explicit control for leaving the bootloader and launching the application. While the bootloader is running and waiting (per Requirement 1), pressing this button should cause it to perform the same vector-table relocation, stack-pointer reset, and jump to the application's reset handler described in Requirement 2 - without requiring a new firmware image to be sent first.
 
 ## Success Criteria
 
-At minimum, you should be able to: flash the bootloader, build the application project, trigger update mode, run your Python script against the correct `.bin` file, press the onboard User button, and then observe the application running on the board afterward (for example, via its LED or UART behavior from Lab 1) - without reprogramming the board through the ST-LINK a second time. If you modify the application code and rebuild it, a second run of your Python script followed by another button press should update the board to reflect those changes.
+At minimum, you should be able to: flash the bootloader, build the application project, trigger update mode, run your Python script against the correct `.bin` file, press the onboard User button, and then observe the application running on the board afterward - without reprogramming the board through the ST-LINK a second time. If you modify the application code and rebuild it, a second run of your Python script followed by another button press should update the board to reflect those changes.
 
 # Bonus Objectives
 
@@ -624,7 +613,7 @@ Instead of submitting individual files, this lab is submitted as a **GitHub repo
 Your repository should reflect real, ongoing development, not a single upload at the end:
 
 - **Commit history:** Commit your work incrementally as you complete each requirement, with messages that describe what each commit actually changes. A repository history with a single commit dumping the entire finished project will not demonstrate this.
-- **Branches:** If you are working with a partner or team, each team member should commit their own contributions on their own branch (or branches), merged into `main` once that work is reviewed and working. Your repository's branches and commit history should make it possible to see which team member did what.
+- **Branches:** Each team member should commit their own contributions on their own branch (or branches), merged into `main` once that work is reviewed and working. Your repository's branches and commit history should make it possible to see which team member did what.
 - **`main` branch:** Keep `main` pointed at your most recent, fully working version of the project - this is the version that will be graded, so make sure everything is merged and up to date before you submit.
 
 Add a `README.md` file at the root of your repository that:
@@ -632,7 +621,7 @@ Add a `README.md` file at the root of your repository that:
 - Briefly explains how your project works - your bootloader's update-mode trigger, how firmware is received and written to flash, how the button-triggered jump to the application works, and how your Python script communicates with it.
 - Includes a link to your YouTube demonstration video.
 
-> **Note:** Make sure your repository is either public, or that your instructor has been added as a collaborator - the grader needs to be able to open your link without requesting access.
+> **Note:** Make sure your repository is public.
 
 To submit, simply copy your GitHub repository's URL and paste it into the Canvas text submission box. No files need to be uploaded directly.
 
