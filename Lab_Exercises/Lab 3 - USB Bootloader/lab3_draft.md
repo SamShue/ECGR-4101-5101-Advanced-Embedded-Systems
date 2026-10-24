@@ -602,3 +602,37 @@ A transfer can be silently corrupted - a dropped byte, electrical noise, or a bu
 
 USB CDC over a cable is fairly reliable, but the lab's simple "just stream the bytes" protocol has no way to recover if something goes wrong mid-transfer. Design a small packet-based protocol instead: break the binary into fixed-size chunks, have the bootloader acknowledge (or reject) each chunk as it arrives, and have the Python script retry a chunk if it doesn't receive an acknowledgment. This mirrors the kind of flow control that real-world firmware update protocols rely on, and it's good practice for thinking about communication protocols as something more than "send bytes and hope."
 
+# How to Submit
+
+Record a video demonstrating the Success Criteria described above. Your video must clearly show all of the following:
+
+- Your full name and student ID displayed on screen or stated verbally at the start of the video.
+- The VS Code window showing your completed bootloader `main.c` code and your completed Python script.
+- The Terminal output showing a successful build and flash of both the bootloader and application projects, with 0 errors.
+- The physical NUCLEO board running the bootloader-launched application with its slow, once-per-second blink - the "before" state.
+- Running your Python script against the "fast blink" `.bin` file, followed by pressing the onboard User button, with the camera still on the board the whole time.
+- The LED switching to a fast blink immediately after the button press, confirming your bootloader correctly overwrote the application's flash region - the "after" state.
+
+Upload your video to **YouTube only** (not Google Drive, OneDrive, or any other platform). Set the video visibility to **Unlisted** so only people with the link can view it. Copy the video link.
+
+Instead of submitting individual files, this lab is submitted as a **GitHub repository**. Your repository must contain:
+
+- Your complete `Lab3_Bootloader` CubeMX project folder.
+- Your complete `Lab3_Application` CubeMX project folder.
+- Your Python script (for example, `firmware_sender.py`) used to transmit firmware to the bootloader.
+
+Your repository should reflect real, ongoing development, not a single upload at the end:
+
+- **Commit history:** Commit your work incrementally as you complete each requirement, with messages that describe what each commit actually changes. A repository history with a single commit dumping the entire finished project will not demonstrate this.
+- **Branches:** If you are working with a partner or team, each team member should commit their own contributions on their own branch (or branches), merged into `main` once that work is reviewed and working. Your repository's branches and commit history should make it possible to see which team member did what.
+- **`main` branch:** Keep `main` pointed at your most recent, fully working version of the project - this is the version that will be graded, so make sure everything is merged and up to date before you submit.
+
+Add a `README.md` file at the root of your repository that:
+
+- Briefly explains how your project works - your bootloader's update-mode trigger, how firmware is received and written to flash, how the button-triggered jump to the application works, and how your Python script communicates with it.
+- Includes a link to your YouTube demonstration video.
+
+> **Note:** Make sure your repository is either public, or that your instructor has been added as a collaborator - the grader needs to be able to open your link without requesting access.
+
+To submit, simply copy your GitHub repository's URL and paste it into the Canvas text submission box. No files need to be uploaded directly.
+
