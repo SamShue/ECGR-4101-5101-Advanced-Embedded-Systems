@@ -222,6 +222,14 @@ You will not need to implement the USB protocol yourself for this lab. STM32 pro
 
 Once the bootloader has received the bytes of a new application image over USB, it still cannot simply drop those bytes directly into flash memory the way you might write to a file or to RAM. Flash memory has some unusual physical properties that the bootloader has to work around, and misunderstanding them is one of the easiest ways to accidentally corrupt a device. This section covers the concepts you'll need before your bootloader can safely rewrite the application's flash region.
 
+### What Is Flash Memory, and Why Is It Different from RAM?
+
+Up to this point in your coursework, most of the memory you've worked with directly has probably been SRAM - the memory used for variables, the stack, and the heap. SRAM is volatile: it only holds whatever was last written to it while the chip has power, and it can be rewritten freely, one byte at a time, with no special preparation. The instant power is removed, its contents are gone.
+
+Flash memory is built very differently, and for a specific reason: it needs to still contain your compiled program the instant the microcontroller powers on, long after whatever programmed it has been unplugged. To make that possible, flash memory is non-volatile - it retains its contents with no power applied at all.
+
+It achieves this by storing each bit in a transistor with an extra, electrically isolated "floating gate" buried inside it. Trapping a small electric charge on that floating gate (or leaving it uncharged) permanently shifts how the transistor behaves, in a way that can be read back later as a `0` or a `1` - and because the gate is electrically isolated from the rest of the circuit, that trapped charge has nowhere to leak away to, even with the power off. This is a fundamentally different physical mechanism from the volatile storage cells used in SRAM, and it comes with a major trade-off: adding charge to a single floating gate (programming a bit to `0`) is a quick, localized operation, but removing that charge (erasing a bit back to `1`) requires a much stronger, longer voltage pulse - one that is only practical to apply across a whole group of cells at once, rather than to a single isolated bit. That one asymmetry is the root cause of nearly everything in this section: it's why flash has to be erased in blocks, why you can't just overwrite old data directly, and why a "page" exists as a concept at all.
+
 ### Erasing Before Writing
 
 Flash memory stores each bit using a tiny transistor that can only be changed in one direction by a normal write operation. Programming a flash memory location can only change bits from `1` to `0`; it cannot change a bit from `0` back to `1`. In order to set bits back to `1`, the flash controller has to perform a separate operation called an erase, which resets an entire block of memory back to all `1`s (every erased byte reads back as `0xFF`) all at once.
@@ -241,9 +249,24 @@ After programming the new application data:
 
 Erasing is also much coarser than programming - a single erase command wipes out an entire page at once, not just the handful of bytes you intend to change. This means the bootloader needs to erase every page the new application image will occupy before it starts writing, or it risks leaving old application bytes mixed in with new ones.
 
+### Pages: The Smallest Unit You Can Erase
+
+The erase pulse described above is naturally applied to many flash cells at once rather than one at a time - building separate erase circuitry for every individual byte would be impractical. So instead, chip manufacturers divide flash memory into fixed-size blocks called pages, and the erase operation always targets one or more whole pages. A page is the smallest region of flash the hardware can erase in a single operation: you cannot erase "just the first half" of a page, and erasing a page always resets every byte in it back to `0xFF`, whether you needed all of it or not.
+
+On the STM32L4 family used in this lab, each flash page is 2 KB (2048 bytes). Since the NUCLEO-L496ZG-P has 1 MB of flash in total, that works out to 512 pages across the whole chip. Combined with the memory map we set up back in Sharing Memory with Two Programs, this tells us exactly how many pages each region of flash occupies:
+
+```
+64 KB bootloader region    = (64 * 1024 bytes) / (2 * 1024 bytes/page)  = 32 pages   (pages 0-31)
+960 KB application region  = (960 * 1024 bytes) / (2 * 1024 bytes/page) = 480 pages  (pages 32-511)
+```
+
+When your bootloader erases the application's flash region as part of Requirement 2, it needs to erase exactly these 480 pages - no fewer, or old application bytes will linger underneath the new image, and no more, since erasing even a single one of the bootloader's own 32 pages while the bootloader is still running from them would corrupt the very program doing the erasing. Always confirm the exact page size for your specific microcontroller in its reference manual before writing this code - it can differ between STM32 families, and even between different flash configurations of the same family.
+
 ### Flash Write Granularity
 
 Although the USB peripheral hands the bootloader its data one byte at a time, the flash controller does not allow writes at that resolution. On the STM32L4 family used in this lab, flash memory must be programmed in aligned 64-bit (8-byte) chunks, referred to as double words. Attempting to program a single byte, or a chunk that isn't aligned to an 8-byte boundary, is not permitted by the hardware.
+
+This restriction isn't arbitrary: the flash controller computes an error-detection code over each 64-bit chunk at the moment it's programmed, so that it can later detect (and in some cases correct) a corrupted bit when that location is read back. Computing that code requires having the full 8 bytes available at once, which is why the hardware only exposes a double-word-at-a-time programming operation rather than a byte-at-a-time one.
 
 This means the bootloader cannot write each byte to flash the moment it arrives over USB. Instead, it needs to collect incoming bytes into a small buffer in RAM, and only once it has accumulated a full double word does it issue a flash program operation for that chunk, then go back to collecting bytes for the next one.
 
@@ -282,13 +305,131 @@ Recall from The USB Peripheral section that our bootloader needs to enumerate as
 
 With USB enabled, continue exactly as you did in Lab 1: open the **Project Manager** tab, give the project a name such as `Lab3_Bootloader`, choose a save location, leave **Application Structure** set to **Advanced**, and set **Toolchain / IDE** to **CMake**. Click **GENERATE CODE**, then open the generated folder in VS Code the same way you did in Lab 1.
 
-## 2. Create the Application Project
+## 2. Write the Bootloader Skeleton
+
+CubeMX already generated a working `SystemClock_Config()`, `MX_GPIO_Init()`, and `MX_USB_DEVICE_Init()` for you, based on the USB configuration you just set up - these correctly drive the USB peripheral's 48 MHz clock requirement for your specific board and CubeMX version, so **leave them untouched**. Everything the bootloader still needs to do belongs in `main()` itself.
+
+Open **Core → Src → main.c** in your `Lab3_Bootloader` project and replace the body of your generated `int main(void)` function with the version below. It already calls every initialization function CubeMX generated for you (including `MX_USB_DEVICE_Init()`, which starts USB enumeration) and marks, with `TODO` comments, exactly where each of the four Project Requirements belongs:
+
+```c
+int main(void)
+{
+  HAL_Init();
+  SystemClock_Config();
+  MX_GPIO_Init();
+  MX_USB_DEVICE_Init();   /* Starts USB enumeration - your laptop will show a new
+                              virtual COM port once this call returns. */
+
+  /* TODO (Requirement 1): Decide here how the bootloader knows a new firmware
+     image is about to arrive, versus just sitting idle until the user button
+     is pressed (Requirement 4). A timeout window measured from this point,
+     or a flag left behind by the application, are both reasonable options. */
+
+  while (1)
+  {
+    /* TODO (Requirement 1, continued): Incoming USB bytes do not show up here
+       automatically - they arrive in CDC_Receive_FS(), inside
+       USB_DEVICE/App/usbd_cdc_if.c, which CubeMX already generated for you.
+       You will need a way to get bytes from that callback into this loop
+       (for example, a shared buffer and a flag), or do your flash
+       programming directly from within that callback instead. Either way,
+       figure out how you'll recognize when the full image has arrived. */
+
+    /* TODO (Requirement 2): Once you have erased the application's flash
+       region and accumulated a full aligned double word of incoming bytes,
+       unlock the flash controller and program that double word starting at
+       0x08010000. Repeat until the entire image has been written, then lock
+       the flash controller again. */
+
+    /* TODO (Requirement 4): Check whether the User button (B1_Pin on GPIOC)
+       is pressed. If it is, relocate the vector table with SCB->VTOR, reset
+       the stack pointer using the application's initial MSP value, and
+       branch to the application's reset handler at 0x08010000 - this does
+       not require a completed firmware transfer first. */
+  }
+}
+```
+
+> **Note:** Double-check `B1_Pin` and `B1_GPIO_Port` against your own project's `main.h` - these are the standard CubeMX names for the Nucleo's User button (B1, on PC13), but confirm them the same way you confirmed `LD1_Pin` back in Lab 1.
+
+## 3. Create the Application Project
 
 The application project is built the same way, but without any of the USB configuration above - in this lab, only the bootloader talks to the PC over USB. Repeat the same board-selector and default-peripheral steps as Lab 1, then name the project something like `Lab3_Application` in the Project Manager tab, keep **Advanced** structure and **CMake** toolchain, and generate the code.
 
 At this point you should have two separate project folders on disk, each with its own `.ioc` file, `CMakeLists.txt`, and `Core/` folder - completely independent of one another, just like the bootloader and application are independent programs on the microcontroller.
 
-## 3. Modify the Linker Scripts to Share Flash
+## 4. Write a Minimal Blink Application
+
+Before you start building the bootloader logic itself, it helps to have a tiny, disposable application to flash and re-flash while you test. Rather than hunting through the generated file for the right spots to add a few lines, simply replace the **entire contents** of **Core → Src → main.c** in your `Lab3_Application` project with the self-contained version below:
+
+```c
+#include "main.h"
+
+#define FAST_BLINK 0   /* 0 = slow blink (original firmware), 1 = fast blink (updated firmware) */
+
+#if FAST_BLINK
+#define BLINK_DELAY_MS 100
+#else
+#define BLINK_DELAY_MS 500
+#endif
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+
+int main(void)
+{
+  HAL_Init();
+  SystemClock_Config();
+  MX_GPIO_Init();
+
+  while (1)
+  {
+    HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+    HAL_Delay(BLINK_DELAY_MS);
+  }
+}
+
+void SystemClock_Config(void)
+{
+  /* This minimal application intentionally skips configuring the PLL and
+     simply runs on the MCU's default reset clock (MSI). HAL_Delay() is
+     still timed correctly against whatever clock is actually running, so
+     the blink rate above is accurate regardless. */
+}
+
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+
+  GPIO_InitStruct.Pin   = LD1_Pin;
+  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull  = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LD1_GPIO_Port, &GPIO_InitStruct);
+}
+
+void Error_Handler(void)
+{
+  __disable_irq();
+  while (1)
+  {
+  }
+}
+```
+
+This pulls in `LD1_Pin` and `LD1_GPIO_Port` from `main.h` (the same macros you located back in Lab 1), so there's nothing else to configure - it builds and runs entirely on its own, with no UART or button handling to get in the way of the one thing this test application needs to do.
+
+> **Note:** `__HAL_RCC_GPIOD_CLK_ENABLE()` assumes LD1 lives on **GPIOD**, which is correct for the NUCLEO-L496ZG-P per Lab 1. If you open `main.h` and find `LD1_GPIO_Port` defined as a different port letter, change this one line to match (for example, `__HAL_RCC_GPIOB_CLK_ENABLE()` for GPIOB).
+
+> **Note:** Because this replaces the whole file rather than living inside the `USER CODE` markers CubeMX normally preserves, regenerating code from CubeMX after this point will overwrite it. If that happens, just paste this same file back in.
+
+Build the project once with `FAST_BLINK` set to `0` and flash it with the ST-LINK (exactly as you did in Lab 1) so the board starts out running a known-good application with a slow, once-per-second blink. Later, when you are ready to test your bootloader, change `FAST_BLINK` to `1`, rebuild, and use the resulting `.bin` file as the "new" firmware you transmit over USB - a correct update should be immediately obvious from the LED switching to a fast blink, with no need to inspect memory or attach a debugger to confirm it worked.
+
+## 5. Modify the Linker Scripts to Share Flash
 
 Right now, both freshly generated projects assume they own the *entire* flash chip starting at `0x08000000` - CubeMX has no way of knowing you intend to run two programs side by side. If you built and flashed both projects as-is, they would each try to occupy the exact same addresses, and the second one would simply overwrite the first. This is exactly the problem we solved conceptually in the Background section by splitting flash into a 64 KB bootloader region and a remaining application region starting at `0x08010000` - we now need to encode that split into each project.
 
@@ -318,7 +459,7 @@ FLASH    (rx)    : ORIGIN = 0x8010000,   LENGTH = 960K
 
 > **Note:** Changing `ORIGIN` only tells the compiler and linker where the application's code *expects* to live - it does not, by itself, change where a programming tool writes the file. When you get to the flashing steps later in this lab, you will need to tell your flashing tool to write the application's `.bin` file starting at `0x08010000` instead of the default `0x08000000`. We will cover exactly how to do that when we reach the flashing instructions.
 
-## 4. Set Up Python on Your Computer
+## 6. Set Up Python on Your Computer
 
 The host-side application described in the Overview - the program that reads your compiled application `.bin` file and transmits it to the bootloader - will be written in Python. Python makes this convenient because it has a simple, well-supported library called `pyserial` for talking to serial (COM) ports, which is exactly what our USB CDC bootloader will look like to your laptop.
 
@@ -353,7 +494,7 @@ pip install pyserial
 3. Create a new file ending in `.py`, for example `firmware_sender.py`. VS Code will recognize it as a Python file and activate the extension's features for it.
 4. Open the Command Palette (**Ctrl+Shift+P**), run **Python: Select Interpreter**, and choose the Python 3 installation you just set up. This tells VS Code which Python installation to use for running your script and for resolving the `pyserial` package you just installed.
 
-## 5. Open a Serial Connection to the Bootloader
+## 7. Open a Serial Connection to the Bootloader
 
 Once your bootloader project is flashed to the board and running (something we'll do later in this lab) and the board is connected to your laptop through its USB OTG FS port, your operating system will enumerate it as a new serial port, exactly as described in The USB Peripheral section.
 
@@ -372,7 +513,7 @@ print(f"Connected to {ser.name}")
 
 This is the same connection you will use later in the lab to actually send the bytes of your compiled application image to the bootloader.
 
-## 6. Locate the Compiled Application Binary
+## 8. Locate the Compiled Application Binary
 
 The file your Python application needs to send is produced automatically every time you build the **application** project - you do not need to run any extra tools to create it. When you click **Build** in the STM32Cube panel (the same action you used in Lab 1), CubeMX's generated CMake project compiles your code into an `.elf` file as before, but it also automatically runs a post-build step that extracts a raw, binary copy of your program into a separate `.bin` file alongside it.
 
@@ -396,7 +537,7 @@ The full path to this `.bin` file is what your Python application will open in b
 
 Everything up to this point has been scaffolding: both projects build, the linker scripts know about each other's flash region, and your laptop can open a serial connection to the board. What remains is the actual bootloader behavior described throughout the Background section. You will implement this yourself, in the `USER CODE` sections of the generated bootloader project and in your own Python script. The guidelines below describe *what* each piece must accomplish and *what to consider* while building it - they are intentionally not step-by-step instructions, since working out the details (and your reasoning for them) is the point of the lab.
 
-Your completed lab should satisfy the following three required components.
+Your completed lab should satisfy the following four required components.
 
 ## Requirement 1: Open the USB Port and Enter Update Mode
 
@@ -405,7 +546,7 @@ The bootloader must initialize the USB CDC stack so that the board enumerates as
 Think through the following as you design this piece:
 
 - CubeMX already generated the initialization call for the USB device stack - your job is to decide what the bootloader *does* with that connection once it's active, not to re-implement enumeration.
-- A bootloader that unconditionally waits forever for USB data would never be able to launch an already-installed application. Decide on a condition that tells the bootloader "a new image is coming" versus "just launch the existing application" - for example, a button held at startup, a timeout window after reset, or a flag left in memory by the application. Any reasonable, clearly-documented approach is acceptable.
+- A bootloader that unconditionally waits forever for USB data would never be able to launch an already-installed application. Decide on a condition that tells the bootloader "a new image is coming" versus "just launch the existing application" - for example, a timeout window after reset or a flag left in memory by the application. (Requirement 4 below covers the button-driven side of this decision, so you don't need the button to do double duty here.)
 - Figure out how your bootloader will know incoming data has *started* and, more importantly, when it has *ended*. The USB CDC driver will hand you bytes as they arrive (either through a receive callback or by polling a buffer) - you need a plan for recognizing the end of the transfer so the bootloader doesn't sit waiting for bytes that will never come. A length prefix, a sentinel value, and a timeout are all reasonable options; a solution that always assumes a fixed image size is not.
 
 ## Requirement 2: Overwrite the Application Firmware
@@ -430,9 +571,20 @@ Your Python script is the host-side half of this exchange. At minimum, it needs 
 
 Keep in mind that flash programming takes real time and USB transfers can arrive faster than the bootloader can consume them. If you send the entire file as one large write, consider whether your bootloader's receive buffer can keep up, and whether you need to send the data in smaller pieces with some form of pacing between them.
 
+## Requirement 4: Transition to the Application via the User Button
+
+The Nucleo board's onboard User button (the same blue button you used in Lab 1) must serve as the explicit control for leaving the bootloader and launching the application. While the bootloader is running and waiting (per Requirement 1), pressing this button should cause it to perform the same vector-table relocation, stack-pointer reset, and jump to the application's reset handler described in Requirement 2 - without requiring a new firmware image to be sent first.
+
+Think through the following as you design this piece:
+
+- Reuse the GPIO configuration CubeMX already generated for the User button in Lab 1 - you are just reading its state (or handling its interrupt) rather than toggling an LED with it this time. Either polling the pin or wiring up an EXTI interrupt is acceptable, as long as a press reliably triggers the transition.
+- Pressing the button should only ever hand off control to the *existing* application image already sitting in flash - it must never itself erase or program anything. Writing a new image is strictly the job of Requirements 1 and 2; this requirement is only about handing off control afterward.
+- Consider what should happen if the button is pressed before the application region has ever been programmed - jumping into erased flash (which reads back as `0xFF`) will fault. You don't need to build an elaborate recovery mechanism for this case, but you should think through how the board behaves and be able to explain the assumption you're making.
+- This also gives you a convenient way to test Requirement 2 in isolation: run your Python transfer, then press the button to confirm the new application launches, rather than relying on an automatic jump the instant the transfer finishes.
+
 ## Success Criteria
 
-At minimum, you should be able to: flash the bootloader, build the application project, trigger update mode, run your Python script against the correct `.bin` file, and then observe the application running on the board afterward (for example, via its LED or UART behavior from Lab 1) - without reprogramming the board through the ST-LINK a second time. If you modify the application code and rebuild it, a second run of your Python script should update the board to reflect those changes.
+At minimum, you should be able to: flash the bootloader, build the application project, trigger update mode, run your Python script against the correct `.bin` file, press the onboard User button, and then observe the application running on the board afterward (for example, via its LED or UART behavior from Lab 1) - without reprogramming the board through the ST-LINK a second time. If you modify the application code and rebuild it, a second run of your Python script followed by another button press should update the board to reflect those changes.
 
 # Bonus Objectives
 
