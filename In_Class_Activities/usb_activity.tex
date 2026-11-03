@@ -1,0 +1,97 @@
+% In-class activity: decoding a USB packet from a D+/D- waveform.
+% Do not compile this file directly; run Generate_USB_Activity.py, which
+% writes the figure and the generated answer data into ./build first.
+% Compiling with \def\keymode{1} before \input produces the instructor key.
+\documentclass[11pt]{article}
+\usepackage[landscape,margin=0.5in]{geometry}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{positioning,decorations.pathreplacing}
+
+\input{build/usb_data.tex}
+
+\ifdefined\keymode
+  \newcommand{\keyans}[1]{\par\smallskip{\color{red}\small\textbf{Key:} #1}\par}
+  \newcommand{\docsuffix}{Instructor Key}
+\else
+  \newcommand{\keyans}[1]{}
+  \newcommand{\docsuffix}{}
+\fi
+
+\setlength{\parindent}{0pt}
+\setlist[enumerate]{leftmargin=*, itemsep=5pt, topsep=2pt}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{ECGR 4101/5101 -- Advanced Embedded Systems}
+\rhead{\docsuffix}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headsep}{8pt}
+
+\begin{document}
+
+{\Large\bfseries In-Class Activity: Decoding a USB Packet}\hfill
+Name: \underline{\hspace{6cm}}\quad Date: \underline{\hspace{2.5cm}}
+
+\smallskip
+The figure below is a capture of the D+ and D- lines during a single packet sent
+by a USB device. The numbers along the top count the bit times, and each dotted
+line marks the middle of a bit time.
+
+\begin{center}
+  \includegraphics[width=\linewidth]{build/usb_waveform.png}
+\end{center}
+
+\begin{enumerate}
+  \item Is this low-speed or full-speed USB?
+    \keyans{\usbSpeed-speed. When idle, \usbIdleHigh{} is high and \usbIdleLow{} is low,
+      because the device's pull-up resistor is on \usbIdleHigh{}; a \usbOtherSpeed-speed
+      device would idle with \usbOtherIdleHigh{} high instead. The bit time of about
+      \usbBitTimeNs{} ns agrees. Line states (S = SE0): \texttt{\usbStates}}
+
+  \item Identify any stuff bits in the frame.
+    \keyans{\usbNumStuff{} stuff bit(s), at bit time(s) \usbStuffCells. Bits on the bus:
+      \texttt{\usbBits}}
+
+  \item Identify the fields of the frame. The format of a frame is shown below, in
+    the order it is transmitted.
+
+    \smallskip
+    \begin{center}
+    \begin{tikzpicture}[
+        field/.style={draw, minimum height=0.9cm, align=center, font=\small, inner sep=2pt}]
+      \node[field, minimum width=1.6cm] (idle) {Idle};
+      \node[field, minimum width=2.4cm, right=0pt of idle] (sync) {SYNC\\8 bits};
+      \node[field, minimum width=2.2cm, right=0pt of sync] (pid) {PID\\4 bits};
+      \node[field, minimum width=2.2cm, right=0pt of pid] (pidchk) {PID check\\4 bits};
+      \draw[decorate, decoration={brace, amplitude=4pt}] ([yshift=2pt]pid.north west) --
+        node[above=4pt, font=\footnotesize]{PID field (8 bits)} ([yshift=2pt]pidchk.north east);
+      \node[field, minimum width=6.2cm, right=0pt of pidchk] (data) {DATA\\8 bits $\times$ number of bytes};
+      \node[field, minimum width=3.4cm, right=0pt of data] (crc) {CRC\\16 bits};
+      \node[field, minimum width=2.4cm, right=0pt of crc] (eop) {EOP\\SE0, SE0, J};
+      \node[field, minimum width=1.6cm, right=0pt of eop] {Idle};
+      \draw[->] ([yshift=-0.35cm]idle.south west) -- node[below, font=\footnotesize]{transmission order}
+        ([yshift=-0.35cm]eop.south east);
+    \end{tikzpicture}
+    \end{center}
+    \keyans{Bit times (including stuff bits): SYNC \usbSyncFirst--\usbSyncLast,
+      PID \usbPidFirst--\usbPidLast, DATA \usbDataFirst--\usbDataLast,
+      CRC \usbCrcFirst--\usbCrcLast, EOP \usbEopFirst--\usbEopLast}
+
+  \item Identify the PID and the data contents of the frame.
+
+    \smallskip
+    \begin{tabular}{@{}l *{9}{c}@{}}
+      \hline
+      Packet type & OUT & IN & SOF & SETUP & DATA0 & DATA1 & ACK & NAK & STALL\\
+      PID[3:0] & \texttt{0001} & \texttt{1001} & \texttt{0101} & \texttt{1101}
+        & \texttt{0011} & \texttt{1011} & \texttt{0010} & \texttt{1010} & \texttt{1110}\\
+      \hline
+    \end{tabular}
+    \keyans{\usbPidName; data bytes: \usbDataBytes}
+\end{enumerate}
+
+\end{document}
