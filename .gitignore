@@ -1,0 +1,36 @@
+# --- STM32CubeIDE / STM32CubeMX ---
+Debug/
+Release/
+build/
+mx.scratch
+*.launch
+.metadata/
+
+# --- CMake (STM32CubeIDE CMake projects) ---
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# --- Toolchain / compiled output ---
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.su
+*.d
+
+# --- Editor / IDE ---
+.vscode/
+.vs/
+*.code-workspace
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# --- Keep Eclipse/CubeIDE project settings that are checked in on purpose ---
+!.settings/
