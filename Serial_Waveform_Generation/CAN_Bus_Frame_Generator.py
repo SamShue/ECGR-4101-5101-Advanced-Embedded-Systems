@@ -142,11 +142,13 @@ def bits_to_can_waveforms(bits: str):
     return can_h, can_l
 
 def plot_can_waveform(bits: str, bit_time: float = 1.0,
-                      filename: str = "can_waveform.png"):
+                      filename: str = "can_waveform.png",
+                      number_bits: bool = False):
     """
     Plot CAN_H and CAN_L waveforms for the given stuffed bitstring,
     add vertical dotted lines between each bit boundary,
     and save to 'filename'.
+    If number_bits is True, each bit time is numbered (1..N) along the top.
     """
     num_bits = len(bits)
     t = [i * bit_time for i in range(num_bits + 1)]
@@ -166,15 +168,21 @@ def plot_can_waveform(bits: str, bit_time: float = 1.0,
         x = i * bit_time
         plt.axvline(x=x, color="gray", linestyle=":", linewidth=0.8)
 
+    if number_bits:
+        for i in range(num_bits):
+            plt.text((i + 0.5) * bit_time, 4.1, str(i + 1),
+                     ha="center", va="center", fontsize=8)
+
     plt.xlabel("Time (bit intervals)")
     plt.ylabel("Voltage (V)")
     plt.title("CAN Bus Waveform")
+    plt.ylim(0.5, 4.6)
 
     # ===== Disable horizontal grid lines =====
     # Horizontal grid removed; vertical lines only are drawn manually above.
     plt.grid(False)
 
-    plt.legend(loc="upper right")
+    plt.legend(loc="lower right", bbox_to_anchor=(1.0, 1.0), ncol=2)
     plt.tight_layout()
     plt.savefig(filename, dpi=150)
     plt.close()

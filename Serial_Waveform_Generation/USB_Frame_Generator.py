@@ -144,7 +144,7 @@ def line_states_to_waveforms(states: str, speed: str, bit_time: float,
 def plot_usb_waveform(states: str, speed: str, filename: str = "usb_waveform.png",
                       number_bits: bool = False):
     """
-    Plot D+ and D- with dotted bit midpoints and save to 'filename'.
+    Plot D+ and D- with dotted bit-boundary gridlines and save to 'filename'.
     If number_bits is True, each bit time is numbered (1..N) along the top.
     """
     bit_time_ns = BIT_TIME_NS[speed]
@@ -156,9 +156,10 @@ def plot_usb_waveform(states: str, speed: str, filename: str = "usb_waveform.png
     plt.plot(t_us, dplus, label="D+", linewidth=1.5)
     plt.plot(t_us, dminus, label="D-", linewidth=1.5)
 
-    # Dotted lines mark the middle of each bit so transitions never land on them
-    for i in range(len(states)):
-        plt.axvline(x=(i + 0.5) * bit_time_ns / 1000.0, color="gray",
+    # Dotted lines mark the boundaries between bit times; each bit's state/value
+    # is read from the space between two boundaries, not at the lines themselves
+    for i in range(1, len(states)):
+        plt.axvline(x=i * bit_time_ns / 1000.0, color="gray",
                     linestyle=":", linewidth=0.8)
 
     if number_bits:

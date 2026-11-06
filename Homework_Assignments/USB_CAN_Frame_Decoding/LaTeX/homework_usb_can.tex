@@ -1,0 +1,149 @@
+% Homework: Decoding USB and CAN Frames.
+% Do not compile this file directly; run Generate_Homework_USB_CAN.py, which
+% generates the waveform figures and the answer data into ./build first.
+% Compiling with \def\keymode{1} before \input produces the instructor key.
+%
+% By design, no PID table or field-format diagram is included here (unlike
+% the in-class activity). Students label the stuff bits and field
+% boundaries directly on each waveform figure, then answer a few short
+% decode questions below it. They are expected to look up the relevant
+% encoding rules, field formats, and PID codes in the USB 2.0 and classical
+% CAN (ISO 11898-1) specifications -- that research is part of the
+% assignment. CRC is not covered in this course, so no CRC questions are
+% asked (the CRC field is still labeled as part of the frame structure).
+\documentclass[11pt]{article}
+\usepackage[landscape,margin=0.5in]{geometry}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\input{build/homework_data.tex}
+
+\ifdefined\keymode
+  \newcommand{\keyans}[1]{\par\smallskip{\color{red}\small\textbf{Key:} #1}\par}
+  \newcommand{\docsuffix}{ -- Instructor Key}
+\else
+  \newcommand{\keyans}[1]{}
+  \newcommand{\docsuffix}{}
+\fi
+
+% Ruled blank space students can use to write labels/notes if they would
+% rather not mark on the figure itself.
+\newcommand{\answerspace}[1]{\par\vspace{#1}\noindent\hrulefill\par\vspace{4pt}}
+
+\setlength{\parindent}{0pt}
+\setlist[enumerate]{leftmargin=*, itemsep=4pt, topsep=2pt}
+
+\begin{document}
+
+{\Large\bfseries ECGR 4101/5101 -- Advanced Embedded Systems}\hfill
+Name: \underline{\hspace{5cm}}\quad Date: \underline{\hspace{2.5cm}}\\[2pt]
+{\large Homework: Decoding USB and CAN Frames\docsuffix}
+
+\smallskip
+Each problem below gives you a waveform captured directly off the bus for one
+frame. No reference tables or diagrams are provided -- you are expected to
+look up the relevant encoding rules, field formats, and PID codes in the USB
+2.0 specification (Problems 1-2) and the classical CAN / ISO 11898-1
+specification (Problem 3). Finding this information yourself is part of the
+assignment. \textbf{On each figure, label any stuff bit(s) you find and the
+boundaries of each field (by bit time), then answer the short questions
+below it.}
+
+\newpage
+\textbf{Problem 1: USB Full-Speed Packet}
+
+\smallskip
+The figure below is a capture of the D+ and D- lines during a single
+\textbf{full-speed} USB data packet. The numbers along the top count the bit
+times, and each dotted line marks the boundary between two bit times.
+
+\begin{center}
+  \includegraphics[width=\linewidth]{build/usb_full_waveform.png}
+\end{center}
+
+Label any stuff bit(s) and the boundaries of the SYNC, PID, DATA, CRC16, and
+EOP fields directly on the figure above.
+\keyans{Stuff bit(s) at bit time(s) \UsbFullStuffCells. SYNC
+  \UsbFullSyncFirst--\UsbFullSyncLast, PID \UsbFullPidFirst--\UsbFullPidLast,
+  DATA \UsbFullDataFirst--\UsbFullDataLast, CRC16
+  \UsbFullCrcFirst--\UsbFullCrcLast, EOP \UsbFullEopFirst--\UsbFullEopLast.}
+
+\answerspace{1.6cm}
+
+\begin{enumerate}
+  \item Decode the PID field. What type of packet is this?
+    \underline{\hspace{4cm}}
+    \keyans{\UsbFullPidName}
+  \item What data byte(s) does this packet carry? Give your answer in hex.
+    \underline{\hspace{5cm}}
+    \keyans{\UsbFullDataBytes}
+\end{enumerate}
+
+\newpage
+\textbf{Problem 2: USB Low-Speed Packet}
+
+\smallskip
+The figure below is a capture of the D+ and D- lines during a single
+\textbf{low-speed} USB data packet. The numbers along the top count the bit
+times, and each dotted line marks the boundary between two bit times.
+
+\begin{center}
+  \includegraphics[width=\linewidth]{build/usb_low_waveform.png}
+\end{center}
+
+Label any stuff bit(s) and the boundaries of the SYNC, PID, DATA, CRC16, and
+EOP fields directly on the figure above.
+\keyans{Stuff bit(s) at bit time(s) \UsbLowStuffCells. SYNC
+  \UsbLowSyncFirst--\UsbLowSyncLast, PID \UsbLowPidFirst--\UsbLowPidLast,
+  DATA \UsbLowDataFirst--\UsbLowDataLast, CRC16
+  \UsbLowCrcFirst--\UsbLowCrcLast, EOP \UsbLowEopFirst--\UsbLowEopLast.}
+
+\answerspace{1.6cm}
+
+\begin{enumerate}
+  \item Decode the PID field. What type of packet is this?
+    \underline{\hspace{4cm}}
+    \keyans{\UsbLowPidName}
+  \item What data byte(s) does this packet carry? Give your answer in hex.
+    \underline{\hspace{5cm}}
+    \keyans{\UsbLowDataBytes}
+\end{enumerate}
+
+\newpage
+\textbf{Problem 3: CAN Data Frame}
+
+\smallskip
+The figure below is a capture of the CAN\_H and CAN\_L lines during a single
+\textbf{standard frame} (11-bit identifier) CAN data frame. The numbers
+along the top count the bit times, and each dotted line marks the boundary
+between two bit times. (Recall that for CAN, a dominant bit is a logical
+\texttt{0} and a recessive bit is a logical \texttt{1}.)
+
+\begin{center}
+  \includegraphics[width=\linewidth]{build/can_waveform.png}
+\end{center}
+
+Label any stuff bit(s) and the boundaries of the SOF, identifier, RTR, IDE,
+r0, DLC, DATA, CRC, CRC delimiter, ACK, and EOF fields directly on the
+figure above. (Note that CAN's bit-stuffing rule is different from USB's.)
+\keyans{Stuff bit(s) at bit time(s) \CanStuffCells. SOF
+  \CanSofFirst--\CanSofLast, ID \CanIdFirst--\CanIdLast, RTR
+  \CanRtrFirst--\CanRtrLast, IDE \CanIdeFirst--\CanIdeLast, r0
+  \CanRsvdFirst--\CanRsvdLast, DLC \CanDlcFirst--\CanDlcLast, DATA
+  \CanDataFirst--\CanDataLast, CRC \CanCrcFirst--\CanCrcLast, CRC delimiter
+  \CanCrcDelimFirst--\CanCrcDelimLast, ACK \CanAckFirst--\CanAckLast, EOF
+  \CanEofFirst--\CanEofLast.}
+
+\answerspace{1.6cm}
+
+\begin{enumerate}
+  \item Decode the 11-bit identifier. Give your answer in hex.
+    \underline{\hspace{4cm}}
+    \keyans{\CanId}
+  \item What data byte(s) does this frame carry? Give your answer in hex.
+    \underline{\hspace{5cm}}
+    \keyans{\CanDataBytes}
+\end{enumerate}
+
+\end{document}
