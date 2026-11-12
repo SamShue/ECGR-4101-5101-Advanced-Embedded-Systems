@@ -159,7 +159,7 @@ def plot_can_waveform(bits: str, bit_time: float = 1.0,
     can_h_step = can_h + [can_h[-1]]
     can_l_step = can_l + [can_l[-1]]
 
-    plt.figure(figsize=(14, 5))
+    plt.figure(figsize=(14, 3))
     plt.step(t, can_h_step, where="post", label="CAN_H", linewidth=1.5)
     plt.step(t, can_l_step, where="post", label="CAN_L", linewidth=1.5)
 
@@ -170,13 +170,13 @@ def plot_can_waveform(bits: str, bit_time: float = 1.0,
 
     if number_bits:
         for i in range(num_bits):
-            plt.text((i + 0.5) * bit_time, 4.1, str(i + 1),
+            plt.text((i + 0.5) * bit_time, 3.75, str(i + 1),
                      ha="center", va="center", fontsize=8)
 
     plt.xlabel("Time (bit intervals)")
     plt.ylabel("Voltage (V)")
     plt.title("CAN Bus Waveform")
-    plt.ylim(0.5, 4.6)
+    plt.ylim(1.1, 3.9)
 
     # ===== Disable horizontal grid lines =====
     # Horizontal grid removed; vertical lines only are drawn manually above.

@@ -2,6 +2,7 @@
 
 \usepackage[top=0.5in, bottom=0.5in, left=0.6in, right=0.6in]{geometry}
 \usepackage{tikz}
+\usetikzlibrary{positioning}
 \usepackage{enumitem}
 \usepackage{graphicx}
 \usepackage{tgheros}
@@ -19,6 +20,39 @@
 
 % Solution text (answers, derivation steps) is shown in red throughout this guide.
 \newcommand{\sol}[1]{\textcolor{red}{#1}}
+
+% Reference diagrams of the USB and CAN frame structures, shown below each
+% waveform (not to scale) to help students locate fields in the questions.
+\newcommand{\usbFrameDiagram}{%
+\begin{center}
+\begin{tikzpicture}[field/.style={draw, minimum height=0.8cm, align=center, font=\small, inner sep=2pt}]
+\node[field, minimum width=1.6cm] (idle1) {Idle};
+\node[field, minimum width=2.1cm, right=0pt of idle1] (sync) {SYNC\\8 bits};
+\node[field, minimum width=2.1cm, right=0pt of sync] (pid) {PID\\8 bits};
+\node[field, minimum width=4.2cm, right=0pt of pid] (data) {DATA\\8 bits $\times$ bytes};
+\node[field, minimum width=2.6cm, right=0pt of data] (crc) {CRC16\\16 bits};
+\node[field, minimum width=2.4cm, right=0pt of crc] (eop) {EOP\\SE0,SE0,J};
+\node[field, minimum width=1.6cm, right=0pt of eop] (idle2) {Idle};
+\draw[->] ([yshift=-0.35cm]idle1.south west) -- node[below, font=\small]{transmission order} ([yshift=-0.35cm]idle2.south east);
+\end{tikzpicture}
+\end{center}}
+
+\newcommand{\canFrameDiagram}{%
+\begin{center}
+\begin{tikzpicture}[field/.style={draw, minimum height=0.8cm, align=center, font=\small, inner sep=1.5pt}]
+\node[field, minimum width=1.3cm] (idle1) {Idle};
+\node[field, minimum width=1.1cm, right=0pt of idle1] (sof) {SOF\\1};
+\node[field, minimum width=1.8cm, right=0pt of sof] (id) {ID\\11};
+\node[field, minimum width=1.1cm, right=0pt of id] (rtr) {RTR\\1};
+\node[field, minimum width=1.1cm, right=0pt of rtr] (ide) {IDE\\1};
+\node[field, minimum width=1.0cm, right=0pt of ide] (r0) {r0\\1};
+\node[field, minimum width=1.4cm, right=0pt of r0] (dlc) {DLC\\4};
+\node[field, minimum width=3.4cm, right=0pt of dlc] (data) {DATA\\8 $\times$ bytes};
+\node[field, minimum width=1.8cm, right=0pt of data] (crc) {CRC\\15};
+\node[field, minimum width=3.9cm, right=0pt of crc] (tail) {Delim/ACK/\\Delim/EOF/IFS};
+\draw[->] ([yshift=-0.35cm]idle1.south west) -- node[below, font=\small]{transmission order} ([yshift=-0.35cm]tail.south east);
+\end{tikzpicture}
+\end{center}}
 
 % Header matching the quiz layout, with an "Answer Key" label in place of the Name/Date fields.
 \newcommand{\solutionsHeader}{%
@@ -56,40 +90,41 @@
 
 \begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=8pt]
 
-\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single \textbf{full-speed} USB data packet.
+\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single USB data packet.
 
 \begin{center}
-\includegraphics[width=0.85\linewidth]{versionA/usb_waveform.png}
+\includegraphics[width=\linewidth]{versionA/usb_waveform.png}
 \end{center}
+\usbFrameDiagram
 
 \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Which bit times contain the SYNC field?
+\item \textbf{(2 points)} Is this a low-speed or full-speed USB packet?
 
-\centerline{\textbf{(A)} 1--3 \qquad \sol{\textbf{(B)} 4--11} \qquad \textbf{(C)} 12--19 \qquad \textbf{(D)} 20--27}
-\sol{SYNC is always the first 8 bits after the 3 idle bits.}
+\centerline{\textbf{(A)} Low-speed (1.5 Mbit/s) \qquad \sol{\textbf{(B)} Full-speed (12 Mbit/s)} \qquad \textbf{(C)} High-speed (480 Mbit/s) \qquad \textbf{(D)} Cannot be determined}
+\sol{The waveform spans about 4.2 \textmu s for 50 bit times, giving a bit time of about 83 ns, matching full-speed USB's 12 Mbit/s rate.}
+
+\item \textbf{(2 points)} Which SYNC field bit pattern (bit times 4--11) is correct?
+
+\centerline{\sol{\textbf{(A)} 00000001} \qquad \textbf{(B)} 10000000 \qquad \textbf{(C)} 01111111 \qquad \textbf{(D)} 11111110}
+\sol{SYNC is a fixed field; it always decodes to \texttt{00000001}, which this waveform confirms.}
 
 \item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
 
 \centerline{\textbf{(A)} bit 34 \qquad \sol{\textbf{(B)} bit 41} \qquad \textbf{(C)} bits 27 and 41 \qquad \textbf{(D)} none}
 \sol{One stuff bit is inserted at bit time 41, inside the CRC16 field, after six consecutive \texttt{1} bits.}
-
-\item \textbf{(3 points)} Decode the PID field (bit times 12--19) using NRZI and match it to the table.
-
-\centerline{\textbf{(A)} DATA0 \qquad \sol{\textbf{(B)} DATA1} \qquad \textbf{(C)} ACK \qquad \textbf{(D)} OUT token}
-\sol{The PID byte decodes to \texttt{11010010}, which matches the \texttt{DATA1} pattern in the table.}
 \end{enumerate}
 
 \item \textbf{(5 points)} The figure below is a capture of the CAN\_H and CAN\_L lines during a single standard-frame CAN data frame.
 
 \begin{center}
-\includegraphics[width=0.7\linewidth]{versionA/can_waveform.png}
+\includegraphics[width=\linewidth]{versionA/can_waveform.png}
 \end{center}
+\canFrameDiagram
 
 \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Which bit times contain the 11-bit identifier field?
+\item \textbf{(1 point)} On the physical bus, a dominant bit corresponds to which logic level?
 
-\centerline{\textbf{(A)} 1--3 \qquad \textbf{(B)} 4--4 \qquad \sol{\textbf{(C)} 5--15} \qquad \textbf{(D)} 16--26}
-\sol{The identifier always immediately follows the single SOF bit (bit time 4).}
+\centerline{\textbf{(A)} Logic 1 \qquad \sol{\textbf{(B)} Logic 0} \qquad \textbf{(C)} High impedance \qquad \textbf{(D)} Depends on the transmitting node}
 
 \item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
 
@@ -123,40 +158,41 @@
 
 \begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=8pt]
 
-\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single \textbf{low-speed} USB data packet.
+\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single USB data packet.
 
 \begin{center}
-\includegraphics[width=0.85\linewidth]{versionB/usb_waveform.png}
+\includegraphics[width=\linewidth]{versionB/usb_waveform.png}
 \end{center}
+\usbFrameDiagram
 
 \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Which bit times contain the SYNC field?
+\item \textbf{(2 points)} Is this a low-speed or full-speed USB packet?
 
-\centerline{\sol{\textbf{(A)} 4--11} \qquad \textbf{(B)} 1--3 \qquad \textbf{(C)} 20--27 \qquad \textbf{(D)} 12--19}
-\sol{SYNC is always the first 8 bits after the 3 idle bits.}
+\centerline{\textbf{(A)} Full-speed (12 Mbit/s) \qquad \textbf{(B)} High-speed (480 Mbit/s) \qquad \sol{\textbf{(C)} Low-speed (1.5 Mbit/s)} \qquad \textbf{(D)} Cannot be determined}
+\sol{The waveform spans about 34 \textmu s for 51 bit times, giving a bit time of about 667 ns, matching low-speed USB's 1.5 Mbit/s rate.}
+
+\item \textbf{(2 points)} Which SYNC field bit pattern (bit times 4--11) is correct?
+
+\centerline{\textbf{(A)} 11111110 \qquad \textbf{(B)} 01111111 \qquad \sol{\textbf{(C)} 00000001} \qquad \textbf{(D)} 10000000}
+\sol{SYNC is a fixed field; it always decodes to \texttt{00000001}, which this waveform confirms.}
 
 \item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
 
 \centerline{\textbf{(A)} bit 41 only \qquad \textbf{(B)} bit 27 only \qquad \sol{\textbf{(C)} bits 27 and 41} \qquad \textbf{(D)} none}
 \sol{Two stuff bits are inserted, at bit times 27 (inside DATA) and 41 (inside CRC16), each after six consecutive \texttt{1} bits.}
-
-\item \textbf{(3 points)} Decode the PID field (bit times 12--19) using NRZI and match it to the table.
-
-\centerline{\textbf{(A)} ACK \qquad \textbf{(B)} OUT token \qquad \textbf{(C)} DATA1 \qquad \sol{\textbf{(D)} DATA0}}
-\sol{The PID byte decodes to \texttt{11000011}, which matches the \texttt{DATA0} pattern in the table.}
 \end{enumerate}
 
 \item \textbf{(5 points)} The figure below is a capture of the CAN\_H and CAN\_L lines during a single standard-frame CAN data frame.
 
 \begin{center}
-\includegraphics[width=0.7\linewidth]{versionB/can_waveform.png}
+\includegraphics[width=\linewidth]{versionB/can_waveform.png}
 \end{center}
+\canFrameDiagram
 
 \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Which bit times contain the 11-bit identifier field?
+\item \textbf{(1 point)} On the physical bus, a dominant bit corresponds to which logic level?
 
-\centerline{\textbf{(A)} 4--4 \qquad \sol{\textbf{(B)} 5--15} \qquad \textbf{(C)} 16--26 \qquad \textbf{(D)} 1--3}
-\sol{The identifier always immediately follows the single SOF bit (bit time 4).}
+\centerline{\textbf{(A)} High impedance \qquad \textbf{(B)} Depends on the transmitting node \qquad \textbf{(C)} Logic 1 \qquad \sol{\textbf{(D)} Logic 0}}
 
 \item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
 

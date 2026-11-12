@@ -4,6 +4,7 @@
 % (but still usable) answer space to avoid excessive page count.
 \usepackage[top=0.3in, bottom=0.3in, left=0.35in, right=0.35in]{geometry}
 \usepackage{tikz}
+\usetikzlibrary{positioning}
 \usepackage{enumitem}
 \usepackage{graphicx}
 \usepackage{tgheros}
@@ -17,6 +18,39 @@
 
 % Set this to the letter identifying this quiz version (e.g. A, B).
 \newcommand{\quizVersion}{B}
+
+% Reference diagrams of the USB and CAN frame structures, shown below each
+% waveform (not to scale) to help students locate fields in the questions.
+\newcommand{\usbFrameDiagram}{%
+\begin{center}
+\begin{tikzpicture}[field/.style={draw, minimum height=0.9cm, align=center, font=\footnotesize, inner sep=2pt}]
+\node[field, minimum width=1.7cm] (idle1) {Idle};
+\node[field, minimum width=2.2cm, right=0pt of idle1] (sync) {SYNC\\8 bits};
+\node[field, minimum width=2.2cm, right=0pt of sync] (pid) {PID\\8 bits};
+\node[field, minimum width=4.3cm, right=0pt of pid] (data) {DATA\\8 bits $\times$ bytes};
+\node[field, minimum width=2.6cm, right=0pt of data] (crc) {CRC16\\16 bits};
+\node[field, minimum width=2.5cm, right=0pt of crc] (eop) {EOP\\SE0,SE0,J};
+\node[field, minimum width=1.7cm, right=0pt of eop] (idle2) {Idle};
+\draw[->] ([yshift=-0.4cm]idle1.south west) -- node[below, font=\footnotesize]{transmission order} ([yshift=-0.4cm]idle2.south east);
+\end{tikzpicture}
+\end{center}}
+
+\newcommand{\canFrameDiagram}{%
+\begin{center}
+\begin{tikzpicture}[field/.style={draw, minimum height=0.9cm, align=center, font=\footnotesize, inner sep=1.5pt}]
+\node[field, minimum width=1.3cm] (idle1) {Idle};
+\node[field, minimum width=1.2cm, right=0pt of idle1] (sof) {SOF\\1};
+\node[field, minimum width=1.8cm, right=0pt of sof] (id) {ID\\11};
+\node[field, minimum width=1.2cm, right=0pt of id] (rtr) {RTR\\1};
+\node[field, minimum width=1.2cm, right=0pt of rtr] (ide) {IDE\\1};
+\node[field, minimum width=1.0cm, right=0pt of ide] (r0) {r0\\1};
+\node[field, minimum width=1.5cm, right=0pt of r0] (dlc) {DLC\\4};
+\node[field, minimum width=3.5cm, right=0pt of dlc] (data) {DATA\\8 $\times$ bytes};
+\node[field, minimum width=1.8cm, right=0pt of data] (crc) {CRC\\15};
+\node[field, minimum width=4.0cm, right=0pt of crc] (tail) {Delim/ACK/\\Delim/EOF/IFS};
+\draw[->] ([yshift=-0.4cm]idle1.south west) -- node[below, font=\footnotesize]{transmission order} ([yshift=-0.4cm]tail.south east);
+\end{tikzpicture}
+\end{center}}
 
 \pagestyle{empty}
 
@@ -47,19 +81,32 @@
 
 \begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=2pt]
 
-\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single \textbf{low-speed} USB data packet. The numbers along the top count the bit times, and each dotted line marks the boundary between two bit times.
+\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single USB data packet. The numbers along the top count the bit times, and each dotted line marks the boundary between two bit times.
 
 \begin{center}
 \includegraphics[width=\linewidth]{usb_waveform.png}
 \end{center}
+\usbFrameDiagram
 
 \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Which bit times contain the \textbf{SYNC} field?
+\item \textbf{(2 points)} Based on the bit time shown in the waveform above, is this a low-speed or full-speed USB packet?
 
 \begin{center}
-\textbf{(A)} 4--11 \quad \textbf{(B)} 1--3
+\textbf{(A)} Full-speed (12 Mbit/s) \quad \textbf{(B)} High-speed (480 Mbit/s)
 
-\textbf{(C)} 20--27 \quad \textbf{(D)} 12--19
+\textbf{(C)} Low-speed (1.5 Mbit/s) \quad \textbf{(D)} Cannot be determined
+\end{center}
+\end{enumerate}
+
+\newpage
+
+\begin{enumerate}[resume, label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(2 points)} Which of the following is the correct SYNC field bit pattern (LSB first, as transmitted on the bus)?
+
+\begin{center}
+\textbf{(A)} 11111110 \quad \textbf{(B)} 01111111
+
+\textbf{(C)} 00000001 \quad \textbf{(D)} 10000000
 \end{center}
 
 \item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
@@ -73,40 +120,20 @@
 
 \newpage
 
-\begin{enumerate}[resume, label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(3 points)} The PID field occupies bit times 12--19. Using NRZI decoding (a transition between consecutive bit times is a \texttt{0}; no transition is a \texttt{1}), decode these 8 bits and match them, LSB first, against the bus patterns below to identify the packet type.
-
-\begin{center}
-\begin{tabular}{ll}
-\texttt{DATA0} & \texttt{11000011} \\
-\texttt{DATA1} & \texttt{11010010} \\
-\texttt{ACK} & \texttt{01001011} \\
-\texttt{OUT token} & \texttt{10000111}
-\end{tabular}
-\end{center}
-
-\begin{center}
-\textbf{(A)} ACK \quad \textbf{(B)} OUT token
-
-\textbf{(C)} DATA1 \quad \textbf{(D)} DATA0
-\end{center}
-\end{enumerate}
-
-\newpage
-
-\item \textbf{(5 points)} The figure below is a capture of the CAN\_H and CAN\_L lines during a single \textbf{standard frame} (11-bit identifier) CAN data frame. Recall that for CAN, a dominant bit is a logical \texttt{0} and a recessive bit is a logical \texttt{1}.
+\item \textbf{(5 points)} The figure below is a capture of the CAN\_H and CAN\_L lines during a single \textbf{standard frame} (11-bit identifier) CAN data frame.
 
 \begin{center}
 \includegraphics[width=\linewidth]{can_waveform.png}
 \end{center}
+\canFrameDiagram
 
 \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Which bit times contain the 11-bit \textbf{identifier} field, immediately following the Start-of-Frame (SOF) bit?
+\item \textbf{(1 point)} On the physical bus, a \textbf{dominant} bit corresponds to which logic level?
 
 \begin{center}
-\textbf{(A)} 4--4 \quad \textbf{(B)} 5--15
+\textbf{(A)} High impedance \quad \textbf{(B)} Depends on the transmitting node
 
-\textbf{(C)} 16--26 \quad \textbf{(D)} 1--3
+\textbf{(C)} Logic 1 \quad \textbf{(D)} Logic 0
 \end{center}
 
 \item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
@@ -121,13 +148,13 @@
 \newpage
 
 \begin{enumerate}[resume, label=(\alph*), leftmargin=*, itemsep=6pt]
-\item \textbf{(1 point)} Based on the DLC field, how many data bytes does this frame carry?
+\item \textbf{(1 point)} How many data bytes does this frame carry?
 
 \begin{center}
 \textbf{(A)} 4 \quad \textbf{(B)} 1 \quad \textbf{(C)} 2 \quad \textbf{(D)} 3
 \end{center}
 
-\item \textbf{(1 point)} Decode the 11-bit identifier carried by this frame (bit times 5--15). Give your answer in hex.
+\item \textbf{(1 point)} Decode the 11-bit identifier carried by this frame. Give your answer in hex.
 
 \begin{center}
 \textbf{(A)} 0x1A8 \quad \textbf{(B)} 0x5C8
