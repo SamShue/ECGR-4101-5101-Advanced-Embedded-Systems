@@ -12,6 +12,13 @@ with no separate file upload required. The same PNGs are also written to
 ./build/images/ in case an instructor prefers to upload them to Canvas Files
 and use lighter-weight <img> references instead.
 
+Unlike the LaTeX/ version, students cannot mark on a physical printout here
+(this homework is completed on Canvas with no paper copy of the waveform),
+so each field is a fill-in-the-blank bit-time range instead of an
+instruction to label the figure by hand. A worked example (SYNC for the USB
+problems, SOF for the CAN problem) is filled in to show the expected
+"first-last" format.
+
 Usage:
     python Generate_Homework_USB_CAN_Canvas.py
 """
@@ -53,17 +60,37 @@ def answer_space(height_em: int = 4) -> str:
             f'margin:14px 0 4px 0;"></div>')
 
 
+def format_range(rng) -> str:
+    """Format a (first, last) bit-time range, collapsing to a single bit
+    time when the field is only one bit wide (e.g. CAN's SOF field)."""
+    first, last = rng
+    return str(first) if first == last else f"{first}-{last}"
+
+
+def field_row(label: str, value_html: str, key_text: str = None) -> str:
+    """One row of the field bit-time table: a label, a blank (or a given
+    example value), and -- in key mode -- the correct range in red."""
+    key_html = f" {key_span(key_text)}" if key_text else ""
+    return (f'<tr><td style="padding:3px 16px 3px 0; white-space:nowrap;">'
+            f'{html_escape(label)}:</td><td>{value_html}{key_html}</td></tr>')
+
+
 def usb_problem(number: int, title: str, image_uri: str, case: dict,
                 key: bool) -> str:
-    stuff_key = (f"Stuff bit(s) at bit time(s) {case['stuff_cells']}. "
-                 f"SYNC {case['ranges']['Sync'][0]}-{case['ranges']['Sync'][1]}, "
-                 f"PID {case['ranges']['Pid'][0]}-{case['ranges']['Pid'][1]}, "
-                 f"DATA {case['ranges']['Data'][0]}-{case['ranges']['Data'][1]}, "
-                 f"CRC16 {case['ranges']['Crc'][0]}-{case['ranges']['Crc'][1]}, "
-                 f"EOP {case['eop_cells'][0]}-{case['eop_cells'][1]}.")
+    r = case["ranges"]
+    stuff_text = f"{case['num_stuff']} stuff bit(s), at bit time(s) {case['stuff_cells']}"
     data_hex = fd.tex_hex(case["data_bytes"])
     pid_line = f"<br>{key_span(case['pid_name'])}" if key else ""
     data_line = f"<br>{key_span(data_hex)}" if key else ""
+
+    field_rows = "".join([
+        field_row("Stuff bit(s)", blank(16), stuff_text if key else None),
+        field_row("SYNC", f"{format_range(r['Sync'])} (example, given)"),
+        field_row("PID field (8 bits)", blank(10), format_range(r["Pid"]) if key else None),
+        field_row("DATA", blank(10), format_range(r["Data"]) if key else None),
+        field_row("CRC16", blank(10), format_range(r["Crc"]) if key else None),
+        field_row("EOP", blank(10), format_range(case["eop_cells"]) if key else None),
+    ])
 
     return f"""
 <h2>Problem {number}: {html_escape(title)}</h2>
@@ -73,9 +100,12 @@ numbers along the top count the bit times, and each dotted line marks the
 boundary between two bit times.</p>
 <p><img src="{image_uri}" alt="USB {html_escape(case['speed'])}-speed waveform"
     style="max-width:100%;"></p>
-<p>Label any stuff bit(s) and the boundaries of the SYNC, PID, DATA, CRC16,
-and EOP fields directly on the figure above.</p>
-{key_span(stuff_key) if key else ""}
+<p>For each row below, write the bit time(s) it occupies (counting any
+stuff bits), in the form <em>first</em>-<em>last</em>. The SYNC field is
+filled in as a worked example.</p>
+<table style="border-collapse:collapse; margin:8px 0 16px 0;">
+{field_rows}
+</table>
 {answer_space()}
 <ol>
   <li>Decode the PID field. What type of packet is this? {blank()}
@@ -89,17 +119,26 @@ and EOP fields directly on the figure above.</p>
 
 def can_problem(image_uri: str, case: dict, key: bool) -> str:
     r = case["ranges"]
-    stuff_key = (f"Stuff bit(s) at bit time(s) {case['stuff_cells']}. "
-                 f"SOF {r['Sof'][0]}-{r['Sof'][1]}, ID {r['Id'][0]}-{r['Id'][1]}, "
-                 f"RTR {r['Rtr'][0]}-{r['Rtr'][1]}, IDE {r['Ide'][0]}-{r['Ide'][1]}, "
-                 f"r0 {r['Rsvd'][0]}-{r['Rsvd'][1]}, DLC {r['Dlc'][0]}-{r['Dlc'][1]}, "
-                 f"DATA {r['Data'][0]}-{r['Data'][1]}, CRC {r['Crc'][0]}-{r['Crc'][1]}, "
-                 f"CRC delimiter {r['CrcDelim'][0]}-{r['CrcDelim'][1]}, "
-                 f"ACK {r['Ack'][0]}-{r['Ack'][1]}, EOF {r['Eof'][0]}-{r['Eof'][1]}.")
+    stuff_text = f"{case['num_stuff']} stuff bit(s), at bit time(s) {case['stuff_cells']}"
     can_id_hex = f"0x{case['can_id']:03X}"
     data_hex = fd.tex_hex(case["data_bytes"])
     id_line = f"<br>{key_span(can_id_hex)}" if key else ""
     data_line = f"<br>{key_span(data_hex)}" if key else ""
+
+    field_rows = "".join([
+        field_row("Stuff bit(s)", blank(16), stuff_text if key else None),
+        field_row("SOF", f"{format_range(r['Sof'])} (example, given)"),
+        field_row("Identifier", blank(10), format_range(r["Id"]) if key else None),
+        field_row("RTR", blank(10), format_range(r["Rtr"]) if key else None),
+        field_row("IDE", blank(10), format_range(r["Ide"]) if key else None),
+        field_row("r0", blank(10), format_range(r["Rsvd"]) if key else None),
+        field_row("DLC", blank(10), format_range(r["Dlc"]) if key else None),
+        field_row("DATA", blank(10), format_range(r["Data"]) if key else None),
+        field_row("CRC", blank(10), format_range(r["Crc"]) if key else None),
+        field_row("CRC delimiter", blank(10), format_range(r["CrcDelim"]) if key else None),
+        field_row("ACK", blank(10), format_range(r["Ack"]) if key else None),
+        field_row("EOF", blank(10), format_range(r["Eof"]) if key else None),
+    ])
 
     return f"""
 <h2>Problem 3: CAN Data Frame</h2>
@@ -109,10 +148,13 @@ The numbers along the top count the bit times, and each dotted line marks
 the boundary between two bit times. (Recall that for CAN, a dominant bit is
 a logical <code>0</code> and a recessive bit is a logical <code>1</code>.)</p>
 <p><img src="{image_uri}" alt="CAN waveform" style="max-width:100%;"></p>
-<p>Label any stuff bit(s) and the boundaries of the SOF, identifier, RTR,
-IDE, r0, DLC, DATA, CRC, CRC delimiter, ACK, and EOF fields directly on the
-figure above. (Note that CAN's bit-stuffing rule is different from USB's.)</p>
-{key_span(stuff_key) if key else ""}
+<p>For each row below, write the bit time(s) it occupies (counting any
+stuff bits), in the form <em>first</em>-<em>last</em>. The SOF field is
+filled in as a worked example. (Note that CAN's bit-stuffing rule is
+different from USB's.)</p>
+<table style="border-collapse:collapse; margin:8px 0 16px 0;">
+{field_rows}
+</table>
 {answer_space()}
 <ol>
   <li>Decode the 11-bit identifier. Give your answer in hex. {blank()}
@@ -147,9 +189,9 @@ one frame. No reference tables or diagrams are provided -- you are expected
 to look up the relevant encoding rules, field formats, and PID codes in the
 USB 2.0 specification (Problems 1-2) and the classical CAN / ISO 11898-1
 specification (Problem 3). Finding this information yourself is part of the
-assignment. <strong>On each figure, label any stuff bit(s) you find and the
-boundaries of each field (by bit time), then answer the short questions
-below it.</strong></p>
+assignment. <strong>For each field, write the bit time(s) it occupies in the
+table below the figure, then answer the short questions that
+follow.</strong></p>
 {body}
 </body>
 </html>

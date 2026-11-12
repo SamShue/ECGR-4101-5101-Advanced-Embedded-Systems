@@ -1,0 +1,185 @@
+\documentclass[10pt]{article}
+
+\usepackage[top=0.5in, bottom=0.5in, left=0.6in, right=0.6in]{geometry}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{tgheros}
+\usepackage{xcolor}
+\renewcommand*{\familydefault}{\sfdefault}
+
+\setlength{\parskip}{0pt}
+
+% Change this value to resize the grade circle on the quiz header.
+\newlength{\gradeCircleRadius}
+\setlength{\gradeCircleRadius}{0.35in}
+
+% Set this to the letter identifying this quiz version (e.g. A, B).
+\newcommand{\quizVersion}{A}
+
+% Solution text (answers, derivation steps) is shown in red throughout this guide.
+\newcommand{\sol}[1]{\textcolor{red}{#1}}
+
+% Header matching the quiz layout, with an "Answer Key" label in place of the Name/Date fields.
+\newcommand{\solutionsHeader}{%
+\noindent
+\begin{minipage}[t]{\dimexpr\textwidth-2\gradeCircleRadius-0.5in\relax}
+    {\large\textbf{ECGR 4101/5101 --- Advanced Embedded Systems}}\par
+    \textbf{Quiz 1: USB and CAN Bus --- Version \quizVersion\ (Solutions Guide)}\\[8pt]
+    \textbf{Answer Key}
+\end{minipage}%
+\hfill
+\raisebox{0.15in}{%
+\begin{minipage}[t]{\dimexpr 2\gradeCircleRadius+0.2in\relax}
+    \centering
+    \begin{tikzpicture}[baseline=(circtop.base)]
+        \coordinate (circtop) at (0,\gradeCircleRadius);
+        \draw[very thick] (0,0) circle (\gradeCircleRadius);
+        \draw[very thick] ({\gradeCircleRadius*cos(225)},{\gradeCircleRadius*sin(225)}) -- ({\gradeCircleRadius*cos(45)},{\gradeCircleRadius*sin(45)});
+        \node at ({0.36*\gradeCircleRadius},{-0.4*\gradeCircleRadius}) {\Large\textbf{10}};
+    \end{tikzpicture}
+\end{minipage}}
+
+\vspace{0.1in}
+\textit{The correct choice for each question is shown in \sol{red}.}
+
+\vspace{0.1in}
+}
+
+\pagestyle{empty}
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\quizVersion}{A}
+\solutionsHeader
+
+\begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=8pt]
+
+\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single \textbf{full-speed} USB data packet.
+
+\begin{center}
+\includegraphics[width=0.85\linewidth]{versionA/usb_waveform.png}
+\end{center}
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(1 point)} Which bit times contain the SYNC field?
+
+\centerline{\textbf{(A)} 1--3 \qquad \sol{\textbf{(B)} 4--11} \qquad \textbf{(C)} 12--19 \qquad \textbf{(D)} 20--27}
+\sol{SYNC is always the first 8 bits after the 3 idle bits.}
+
+\item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
+
+\centerline{\textbf{(A)} bit 34 \qquad \sol{\textbf{(B)} bit 41} \qquad \textbf{(C)} bits 27 and 41 \qquad \textbf{(D)} none}
+\sol{One stuff bit is inserted at bit time 41, inside the CRC16 field, after six consecutive \texttt{1} bits.}
+
+\item \textbf{(3 points)} Decode the PID field (bit times 12--19) using NRZI and match it to the table.
+
+\centerline{\textbf{(A)} DATA0 \qquad \sol{\textbf{(B)} DATA1} \qquad \textbf{(C)} ACK \qquad \textbf{(D)} OUT token}
+\sol{The PID byte decodes to \texttt{11010010}, which matches the \texttt{DATA1} pattern in the table.}
+\end{enumerate}
+
+\item \textbf{(5 points)} The figure below is a capture of the CAN\_H and CAN\_L lines during a single standard-frame CAN data frame.
+
+\begin{center}
+\includegraphics[width=0.7\linewidth]{versionA/can_waveform.png}
+\end{center}
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(1 point)} Which bit times contain the 11-bit identifier field?
+
+\centerline{\textbf{(A)} 1--3 \qquad \textbf{(B)} 4--4 \qquad \sol{\textbf{(C)} 5--15} \qquad \textbf{(D)} 16--26}
+\sol{The identifier always immediately follows the single SOF bit (bit time 4).}
+
+\item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
+
+\centerline{\textbf{(A)} bit 14 \qquad \sol{\textbf{(B)} bit 21} \qquad \textbf{(C)} bits 14 and 21 \qquad \textbf{(D)} none}
+\sol{One stuff bit is inserted at bit time 21, inside the DLC field, after five consecutive identical bits.}
+
+\item \textbf{(1 point)} How many data bytes does this frame carry?
+
+\centerline{\sol{\textbf{(A)} 1} \qquad \textbf{(B)} 2 \qquad \textbf{(C)} 3 \qquad \textbf{(D)} 4}
+\sol{The DLC field decodes to \texttt{0001}, i.e.\ 1 data byte.}
+
+\item \textbf{(1 point)} Decode the 11-bit identifier carried by this frame. Give your answer in hex.
+
+\centerline{\sol{\textbf{(A)} 0x245} \qquad \textbf{(B)} 0x244 \qquad \textbf{(C)} 0x645 \qquad \textbf{(D)} 0x225}
+\sol{The 11 identifier bits decode to \texttt{010 0100 0101}, i.e.\ 0x245.}
+
+\item \textbf{(1 point)} If we have two identifiers that were transmitted at the same time, which one would be placed on the bus?
+
+\centerline{\sol{\textbf{(A)} The identifier with the numerically lower value} \qquad \textbf{(B)} The identifier with the numerically higher value}
+\centerline{\textbf{(C)} Whichever node started transmitting first \qquad \textbf{(D)} Both are placed on the bus simultaneously}
+\sol{A lower identifier has more leading \texttt{0}s (dominant bits). During arbitration, as soon as one node transmits a recessive (\texttt{1}) bit while another transmits dominant (\texttt{0}), the node sending the \texttt{1} loses and stops transmitting --- so the numerically lower identifier wins the bus.}
+\end{enumerate}
+
+\end{enumerate}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\quizVersion}{B}
+\solutionsHeader
+
+\begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=8pt]
+
+\item \textbf{(5 points)} The figure below is a capture of the D+ and D- lines during a single \textbf{low-speed} USB data packet.
+
+\begin{center}
+\includegraphics[width=0.85\linewidth]{versionB/usb_waveform.png}
+\end{center}
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(1 point)} Which bit times contain the SYNC field?
+
+\centerline{\sol{\textbf{(A)} 4--11} \qquad \textbf{(B)} 1--3 \qquad \textbf{(C)} 20--27 \qquad \textbf{(D)} 12--19}
+\sol{SYNC is always the first 8 bits after the 3 idle bits.}
+
+\item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
+
+\centerline{\textbf{(A)} bit 41 only \qquad \textbf{(B)} bit 27 only \qquad \sol{\textbf{(C)} bits 27 and 41} \qquad \textbf{(D)} none}
+\sol{Two stuff bits are inserted, at bit times 27 (inside DATA) and 41 (inside CRC16), each after six consecutive \texttt{1} bits.}
+
+\item \textbf{(3 points)} Decode the PID field (bit times 12--19) using NRZI and match it to the table.
+
+\centerline{\textbf{(A)} ACK \qquad \textbf{(B)} OUT token \qquad \textbf{(C)} DATA1 \qquad \sol{\textbf{(D)} DATA0}}
+\sol{The PID byte decodes to \texttt{11000011}, which matches the \texttt{DATA0} pattern in the table.}
+\end{enumerate}
+
+\item \textbf{(5 points)} The figure below is a capture of the CAN\_H and CAN\_L lines during a single standard-frame CAN data frame.
+
+\begin{center}
+\includegraphics[width=0.7\linewidth]{versionB/can_waveform.png}
+\end{center}
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(1 point)} Which bit times contain the 11-bit identifier field?
+
+\centerline{\textbf{(A)} 4--4 \qquad \sol{\textbf{(B)} 5--15} \qquad \textbf{(C)} 16--26 \qquad \textbf{(D)} 1--3}
+\sol{The identifier always immediately follows the single SOF bit (bit time 4).}
+
+\item \textbf{(1 point)} Which bit time(s) contain a bit-stuffing bit?
+
+\centerline{\textbf{(A)} bit 18 only \qquad \textbf{(B)} bit 53 only \qquad \sol{\textbf{(C)} bits 18 and 53} \qquad \textbf{(D)} none}
+\sol{Two stuff bits are inserted, at bit times 18 (between IDE and r0) and 53 (inside CRC), each after five consecutive identical bits.}
+
+\item \textbf{(1 point)} How many data bytes does this frame carry?
+
+\centerline{\textbf{(A)} 4 \qquad \textbf{(B)} 1 \qquad \sol{\textbf{(C)} 2} \qquad \textbf{(D)} 3}
+\sol{The DLC field decodes to \texttt{0010}, i.e.\ 2 data bytes.}
+
+\item \textbf{(1 point)} Decode the 11-bit identifier carried by this frame. Give your answer in hex.
+
+\centerline{\textbf{(A)} 0x1A8 \qquad \textbf{(B)} 0x5C8 \qquad \sol{\textbf{(C)} 0x1C8} \qquad \textbf{(D)} 0x1C9}
+\sol{The 11 identifier bits decode to \texttt{001 1100 1000}, i.e.\ 0x1C8.}
+
+\item \textbf{(1 point)} If we have two identifiers that were transmitted at the same time, which one would be placed on the bus?
+
+\centerline{\textbf{(A)} Whichever node started transmitting first \qquad \textbf{(B)} Both are placed on the bus simultaneously}
+\centerline{\sol{\textbf{(C)} The identifier with the numerically lower value} \qquad \textbf{(D)} The identifier with the numerically higher value}
+\sol{A lower identifier has more leading \texttt{0}s (dominant bits). During arbitration, as soon as one node transmits a recessive (\texttt{1}) bit while another transmits dominant (\texttt{0}), the node sending the \texttt{1} loses and stops transmitting --- so the numerically lower identifier wins the bus.}
+\end{enumerate}
+
+\end{enumerate}
+
+\end{document}
