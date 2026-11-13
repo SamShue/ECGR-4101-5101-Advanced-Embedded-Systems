@@ -1,4 +1,3 @@
-/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -15,22 +14,10 @@
   *
   ******************************************************************************
   */
-/* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-typedef void (*pFunction)(void);
-/* USER CODE END PTD */
-
 /* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
 /* Start of the application image, immediately after the bootloader region
    reserved in STM32L496xx_FLASH.ld (must match the application project's
    FLASH ORIGIN in its own linker script). */
@@ -40,71 +27,37 @@ typedef void (*pFunction)(void);
    before it hands control over to the application. */
 #define BOOTLOADER_BLINK_COUNT   10U
 #define BOOTLOADER_BLINK_DELAY_MS 150U
-/* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef hlpuart1;
-
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_LPUART1_UART_Init(void);
 
-/* USER CODE BEGIN PFP */
 static void JumpToApplication(uint32_t appAddress);
-/* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
 /**
   * @brief  Hands control over from the bootloader to the application image
-  *         flashed at appAddress. Re-initializes the stack pointer and vector
-  *         table offset, then jumps to the application's Reset_Handler.
+  *         flashed at appAddress: sets the application's initial stack
+  *         pointer and vector table offset, then jumps to its Reset_Handler.
   * @param  appAddress: start address of the application's vector table.
-  * @retval None (does not return if the application image is valid)
+  * @retval None (never returns - control passes to the application)
   */
 static void JumpToApplication(uint32_t appAddress)
 {
   uint32_t appStack = *(__IO uint32_t *)appAddress;
-  uint32_t appEntry  = *(__IO uint32_t *)(appAddress + 4U);
+  void (*appEntry)(void) = (void (*)(void))(*(__IO uint32_t *)(appAddress + 4U));
 
-  /* Sanity check: the application's initial stack pointer should point
-     somewhere inside SRAM. If it doesn't, there is no valid application
-     programmed at appAddress, so stay in the bootloader instead of jumping
-     into the weeds. */
-  if ((appStack & 0x2FFE0000U) != 0x20000000U)
-  {
-    return;
-  }
+  SCB->VTOR = appAddress;    /* Relocate the vector table to the application */
+  __set_MSP(appStack);      /* Load the application's initial stack pointer */
 
-  pFunction JumpToApp = (pFunction)appEntry;
-
-  /* De-initialize peripherals/clocks so the application starts from a known
-     reset-like state, then disable interrupts for the handoff. */
-  HAL_RCC_DeInit();
-  HAL_DeInit();
-  SysTick->CTRL = 0U;
-  SysTick->LOAD = 0U;
-  SysTick->VAL  = 0U;
-  __disable_irq();
-
-  /* Relocate the vector table to the application and set its stack pointer. */
-  SCB->VTOR = appAddress;
-  __set_MSP(appStack);
-
-  __enable_irq();
-  JumpToApp();
+  appEntry();                /* Jump to the application's Reset_Handler */
 }
-/* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
@@ -112,31 +65,18 @@ static void JumpToApplication(uint32_t appAddress)
   */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
   /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_LPUART1_UART_Init();
-  /* USER CODE BEGIN 2 */
+
   /* Blink the onboard LED (LD2) a few times to visually indicate the
      bootloader is running, then hand control over to the application. */
   for (uint32_t i = 0U; i < BOOTLOADER_BLINK_COUNT; i++)
@@ -147,20 +87,12 @@ int main(void)
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   JumpToApplication(APP_START_ADDRESS);
-  /* USER CODE END 2 */
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
+  /* Execution never reaches this point: JumpToApplication() hands control
+     to the application and does not return. */
   while (1)
   {
-    /* USER CODE END WHILE */
-    /* If JumpToApplication() returns, no valid application image was found
-       at APP_START_ADDRESS. Keep blinking fast to signal that error. */
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(50U);
-    /* USER CODE BEGIN 3 */
   }
-  /* USER CODE END 3 */
 }
 
 /**
@@ -230,14 +162,6 @@ void SystemClock_Config(void)
   */
 static void MX_LPUART1_UART_Init(void)
 {
-
-  /* USER CODE BEGIN LPUART1_Init 0 */
-
-  /* USER CODE END LPUART1_Init 0 */
-
-  /* USER CODE BEGIN LPUART1_Init 1 */
-
-  /* USER CODE END LPUART1_Init 1 */
   hlpuart1.Instance = LPUART1;
   hlpuart1.Init.BaudRate = 209700;
   hlpuart1.Init.WordLength = UART_WORDLENGTH_7B;
@@ -251,10 +175,6 @@ static void MX_LPUART1_UART_Init(void)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN LPUART1_Init 2 */
-
-  /* USER CODE END LPUART1_Init 2 */
-
 }
 
 /**
@@ -265,9 +185,6 @@ static void MX_LPUART1_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  /* USER CODE BEGIN MX_GPIO_Init_1 */
-
-  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -308,15 +225,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
-
-  /* USER CODE BEGIN MX_GPIO_Init_2 */
-
-  /* USER CODE END MX_GPIO_Init_2 */
 }
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
@@ -324,13 +233,11 @@ static void MX_GPIO_Init(void)
   */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)
   {
   }
-  /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT
 /**
@@ -342,9 +249,7 @@ void Error_Handler(void)
   */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
