@@ -1,0 +1,249 @@
+\documentclass[10pt]{article}
+
+\usepackage[top=0.5in, bottom=0.5in, left=0.6in, right=0.6in]{geometry}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{tgheros}
+\usepackage{xcolor}
+\renewcommand*{\familydefault}{\sfdefault}
+
+\setlength{\parskip}{0pt}
+
+% Change this value to resize the grade circle on the quiz header.
+\newlength{\gradeCircleRadius}
+\setlength{\gradeCircleRadius}{0.35in}
+
+% Set this to the letter identifying this quiz version (e.g. A, B).
+\newcommand{\quizVersion}{A}
+
+% Solution text (answers, derivation steps) is shown in red throughout this guide.
+\newcommand{\sol}[1]{\textcolor{red}{#1}}
+
+% Reference diagram of the flash memory map, shown above Question 2 to help
+% students locate the bootloader and application regions and their vector
+% tables (not to scale). Addresses are supplied per version.
+\newcommand{\flashMapDiagram}[2]{%
+\begin{center}
+\begin{tikzpicture}[region/.style={draw, align=center, font=\small, text width=4.4cm, inner sep=4pt}]
+\node[region, minimum height=1.6cm, fill=blue!5] (app) {Application\\[1pt] #2\\[1pt] own vector table at its base};
+\node[region, minimum height=1.0cm, fill=orange!10, below=0pt of app] (boot) {Bootloader\\[1pt] #1\\[1pt] own vector table at its base};
+\draw[->, thick] ([xshift=-0.9cm]boot.south west) ++(0,-0.05) -- node[left, font=\scriptsize, align=right] {hardware\\fetches SP\\and reset\\vector here,\\always} ([xshift=-0.9cm]boot.west);
+\draw[->, thick, dashed] ([xshift=1.4cm]boot.east) to[bend left=35] node[right, font=\scriptsize, align=left] {bootloader\\jumps here\\to run the\\application} ([xshift=1.4cm]app.east);
+\end{tikzpicture}
+\end{center}}
+
+% Header matching the quiz layout, with an "Answer Key" label in place of the Name/Date fields.
+\newcommand{\solutionsHeader}{%
+\noindent
+\begin{minipage}[t]{\dimexpr\textwidth-2\gradeCircleRadius-0.5in\relax}
+    {\large\textbf{ECGR 4101/5101 --- Advanced Embedded Systems}}\par
+    \textbf{Quiz 2: Startup Process and Bootloaders --- Version \quizVersion\ (Solutions Guide)}\\[8pt]
+    \textbf{Answer Key}
+\end{minipage}%
+\hfill
+\raisebox{0.15in}{%
+\begin{minipage}[t]{\dimexpr 2\gradeCircleRadius+0.2in\relax}
+    \centering
+    \begin{tikzpicture}[baseline=(circtop.base)]
+        \coordinate (circtop) at (0,\gradeCircleRadius);
+        \draw[very thick] (0,0) circle (\gradeCircleRadius);
+        \draw[very thick] ({\gradeCircleRadius*cos(225)},{\gradeCircleRadius*sin(225)}) -- ({\gradeCircleRadius*cos(45)},{\gradeCircleRadius*sin(45)});
+        \node at ({0.36*\gradeCircleRadius},{-0.4*\gradeCircleRadius}) {\Large\textbf{10}};
+    \end{tikzpicture}
+\end{minipage}}
+
+\vspace{0.1in}
+\textit{The correct choice for each question is shown in \sol{red}.}
+
+\vspace{0.1in}
+}
+
+\pagestyle{empty}
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\quizVersion}{A}
+\solutionsHeader
+
+\begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=8pt]
+
+\item \textbf{(5 points)} There is no operating system on a bare-metal microcontroller to set up memory before your code runs -- the microcontroller's own startup code has to do that job itself.
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(2 points)} Which of the following correctly orders the sequence of events between power-up and the execution of the first instruction in \texttt{main()}?
+
+\begin{center}
+\begin{tabular}{@{}rl@{}}
+\sol{\textbf{(A)}} & \sol{SP load $\rightarrow$ reset-vector load $\rightarrow$ early setup $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{.bss} zero $\rightarrow$ \texttt{main()}} \\
+\textbf{(B)} & SP load $\rightarrow$ reset-vector load $\rightarrow$ \texttt{main()} $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{.bss} zero $\rightarrow$ early setup \\
+\textbf{(C)} & early setup $\rightarrow$ SP load $\rightarrow$ reset-vector load $\rightarrow$ \texttt{.bss} zero $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{main()} \\
+\textbf{(D)} & SP load $\rightarrow$ reset-vector load $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{.bss} zero $\rightarrow$ early setup $\rightarrow$ \texttt{main()} \\
+\end{tabular}
+\end{center}
+\sol{Hardware always loads the stack pointer and reset vector first, automatically. Everything after that is performed by the startup code itself: early core/device setup, then the \texttt{.data} copy, then the \texttt{.bss} zero, and only then \texttt{main()}.}
+
+\item \textbf{(2 points)} A global variable is declared \texttt{int sensorGain = 5;}. If the \texttt{.data} copy were skipped, what value would \texttt{sensorGain} actually have the first time \texttt{main()} reads it?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} 5 (baked into the machine code) & \textbf{(B)} 0 (SRAM defaults to zero) \\[3pt]
+\sol{\textbf{(C)} Garbage already sitting in SRAM} & \textbf{(D)} The program fails to compile \\
+\end{tabular}
+\end{center}
+\sol{The value 5 only ever exists in flash, as part of the \texttt{.data} initializer image; nothing copied it into SRAM, so \texttt{sensorGain} reads whatever bits happened to already be at that SRAM address.}
+
+\item \textbf{(1 point)} A global variable is declared \texttt{static int sampleCount;} with no explicit initializer. If \texttt{.bss} zero-init were skipped, what value would \texttt{sampleCount} have?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} 0 (C guarantees it, no hardware needed) & \sol{\textbf{(B)} Garbage already sitting in SRAM} \\[3pt]
+\textbf{(C)} 5, same as \texttt{sensorGain} & \textbf{(D)} The program fails to compile \\
+\end{tabular}
+\end{center}
+\sol{The C language's "zero by default" guarantee is only honored because the startup code actually zeroes \texttt{.bss} in SRAM before \texttt{main()} runs -- it is not automatic or free; skip that step and the guarantee is broken.}
+\end{enumerate}
+
+\item \textbf{(5 points)} A bootloader and the application it manages are built as two separate programs that share one physical flash chip, as shown below (addresses are representative, not to scale).
+
+\flashMapDiagram{0x0800\_0000 -- 0x0800\_7FFF}{0x0800\_8000 -- 0x080F\_FFFF}
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(1 point)} At reset, hardware always fetches the initial stack pointer and reset vector from the same fixed base address of flash. Which program must be placed at that fixed address?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} The application & \sol{\textbf{(B)} The bootloader} \\[3pt]
+\textbf{(C)} Either one -- it does not matter & \textbf{(D)} A separate ``reset program'' \\
+\end{tabular}
+\end{center}
+\sol{Hardware has no concept of "bootloader" or "application" -- it unconditionally runs whatever program's vector table sits at the fixed boot address, so that program must be the bootloader.}
+
+\item \textbf{(2 points)} The bootloader jumps to the application's reset handler without ever changing the processor's vector-table pointer. An interrupt then fires. Whose interrupt handler actually executes?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} The application's & \sol{\textbf{(B)} The bootloader's} \\[3pt]
+\textbf{(C)} Neither -- a hard fault, no handler at all & \textbf{(D)} Whichever is closest in flash \\
+\end{tabular}
+\end{center}
+\sol{The vector-table pointer was set once, at the very first reset, to the bootloader's table. Jumping into the application's code does not change it, so interrupts still look up handlers in the bootloader's table.}
+
+\item \textbf{(1 point)} What is the one action the application's startup code must take so interrupts route to its own handlers instead of the bootloader's?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} Recompile the bootloader without a vector table & \sol{\textbf{(B)} Update the vector-table pointer to the application's own table} \\[3pt]
+\textbf{(C)} Move the application's code to 0x0800\_0000 & \textbf{(D)} Disable all interrupts permanently \\
+\end{tabular}
+\end{center}
+\sol{This is the step that is easy to forget -- without it, the handoff appears to work fine right up until the first interrupt fires.}
+
+\item \textbf{(1 point)} Why must the bootloader and application be built as two separate projects, each with its own linker script defining a non-overlapping flash region?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\sol{\textbf{(A)} So each can be (re)flashed independently without overwriting the other} & \textbf{(B)} A linker script cannot produce more than one vector table \\[3pt]
+\textbf{(C)} The two programs would otherwise be forced to share one stack pointer & \textbf{(D)} It is not actually required -- only a style preference \\
+\end{tabular}
+\end{center}
+\sol{A bootloader's entire purpose is to update or manage the application independently; that only works if each program owns its own non-overlapping region of flash, defined by its own linker script.}
+\end{enumerate}
+
+\end{enumerate}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\quizVersion}{B}
+\solutionsHeader
+
+\begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=*, itemsep=8pt]
+
+\item \textbf{(5 points)} There is no operating system on a bare-metal microcontroller to set up memory before your code runs -- the microcontroller's own startup code has to do that job itself.
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(2 points)} Which of the following correctly orders the sequence of events between power-up and the execution of the first instruction in \texttt{main()}?
+
+\begin{center}
+\begin{tabular}{@{}rl@{}}
+\textbf{(A)} & SP load $\rightarrow$ reset-vector load $\rightarrow$ \texttt{.bss} zero $\rightarrow$ \texttt{.data} copy $\rightarrow$ early setup $\rightarrow$ \texttt{main()} \\
+\textbf{(B)} & early setup $\rightarrow$ SP load $\rightarrow$ reset-vector load $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{.bss} zero $\rightarrow$ \texttt{main()} \\
+\sol{\textbf{(C)}} & \sol{SP load $\rightarrow$ reset-vector load $\rightarrow$ early setup $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{.bss} zero $\rightarrow$ \texttt{main()}} \\
+\textbf{(D)} & reset-vector load $\rightarrow$ SP load $\rightarrow$ early setup $\rightarrow$ \texttt{.data} copy $\rightarrow$ \texttt{.bss} zero $\rightarrow$ \texttt{main()} \\
+\end{tabular}
+\end{center}
+\sol{Hardware always loads the stack pointer and reset vector first, automatically. Everything after that is performed by the startup code itself: early core/device setup, then the \texttt{.data} copy, then the \texttt{.bss} zero, and only then \texttt{main()}.}
+
+\item \textbf{(2 points)} A global variable is declared \texttt{int calOffset = 7;}. If the \texttt{.data} copy were skipped, what value would \texttt{calOffset} actually have the first time \texttt{main()} reads it?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\sol{\textbf{(A)} Garbage already sitting in SRAM} & \textbf{(B)} 7 (baked into the machine code) \\[3pt]
+\textbf{(C)} 0 (SRAM defaults to zero) & \textbf{(D)} The program fails to compile \\
+\end{tabular}
+\end{center}
+\sol{The value 7 only ever exists in flash, as part of the \texttt{.data} initializer image; nothing copied it into SRAM, so \texttt{calOffset} reads whatever bits happened to already be at that SRAM address.}
+
+\item \textbf{(1 point)} A global variable is declared \texttt{static int errorFlag;} with no explicit initializer. If \texttt{.bss} zero-init were skipped, what value would \texttt{errorFlag} have?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} 7, same as \texttt{calOffset} & \textbf{(B)} 0 (C guarantees it, no hardware needed) \\[3pt]
+\textbf{(C)} The program fails to compile & \sol{\textbf{(D)} Garbage already sitting in SRAM} \\
+\end{tabular}
+\end{center}
+\sol{The C language's "zero by default" guarantee is only honored because the startup code actually zeroes \texttt{.bss} in SRAM before \texttt{main()} runs -- it is not automatic or free; skip that step and the guarantee is broken.}
+\end{enumerate}
+
+\item \textbf{(5 points)} A bootloader and the application it manages are built as two separate programs that share one physical flash chip, as shown below (addresses are representative, not to scale).
+
+\flashMapDiagram{0x0800\_0000 -- 0x0800\_FFFF}{0x0801\_0000 -- 0x080F\_FFFF}
+
+\begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=6pt]
+\item \textbf{(1 point)} At reset, hardware always fetches the initial stack pointer and reset vector from the same fixed base address of flash. Which program must be placed at that fixed address?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\sol{\textbf{(A)} The bootloader} & \textbf{(B)} The application \\[3pt]
+\textbf{(C)} A separate ``reset program'' & \textbf{(D)} Either one -- it does not matter \\
+\end{tabular}
+\end{center}
+\sol{Hardware has no concept of "bootloader" or "application" -- it unconditionally runs whatever program's vector table sits at the fixed boot address, so that program must be the bootloader.}
+
+\item \textbf{(2 points)} The bootloader jumps to the application's reset handler without ever changing the processor's vector-table pointer. An interrupt then fires. Whose interrupt handler actually executes?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} The application's & \textbf{(B)} Whichever is closest in flash \\[3pt]
+\textbf{(C)} Neither -- a hard fault, no handler at all & \sol{\textbf{(D)} The bootloader's} \\
+\end{tabular}
+\end{center}
+\sol{The vector-table pointer was set once, at the very first reset, to the bootloader's table. Jumping into the application's code does not change it, so interrupts still look up handlers in the bootloader's table.}
+
+\item \textbf{(1 point)} What is the one action the application's startup code must take so interrupts route to its own handlers instead of the bootloader's?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} Move the application's code to 0x0800\_0000 & \textbf{(B)} Disable all interrupts permanently \\[3pt]
+\sol{\textbf{(C)} Update the vector-table pointer to the application's own table} & \textbf{(D)} Recompile the bootloader without a vector table \\
+\end{tabular}
+\end{center}
+\sol{This is the step that is easy to forget -- without it, the handoff appears to work fine right up until the first interrupt fires.}
+
+\item \textbf{(1 point)} Why must the bootloader and application be built as two separate projects, each with its own linker script defining a non-overlapping flash region?
+
+\begin{center}
+\begin{tabular}{@{}p{0.47\linewidth}@{\hspace{0.04\linewidth}}p{0.47\linewidth}@{}}
+\textbf{(A)} It is not required -- only a style preference & \sol{\textbf{(B)} So each can be (re)flashed independently} \\[3pt]
+\textbf{(C)} They would otherwise be forced to share one stack pointer & \textbf{(D)} One linker script cannot produce more than one vector table \\
+\end{tabular}
+\end{center}
+\sol{A bootloader's entire purpose is to update or manage the application independently; that only works if each program owns its own non-overlapping region of flash, defined by its own linker script.}
+\end{enumerate}
+
+\end{enumerate}
+
+\end{document}
