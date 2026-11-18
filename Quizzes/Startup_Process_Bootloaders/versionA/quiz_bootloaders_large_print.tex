@@ -32,8 +32,10 @@
 \begin{tikzpicture}[region/.style={draw, align=center, font=\footnotesize, text width=5.2cm, inner sep=5pt}]
 \node[region, minimum height=2.0cm, fill=blue!5] (app) {Application\\[1pt] 0x0800\_8000 -- 0x080F\_FFFF\\[1pt] own vector table at 0x0800\_8000};
 \node[region, minimum height=1.3cm, fill=orange!10, below=0pt of app] (boot) {Bootloader\\[1pt] 0x0800\_0000 -- 0x0800\_7FFF\\[1pt] own vector table at 0x0800\_0000};
-\draw[->, thick] ([xshift=-1.0cm]boot.south west) ++(0,-0.05) -- node[left, font=\scriptsize, align=right] {hardware\\fetches SP\\and reset\\vector here,\\always} ([xshift=-1.0cm]boot.west);
-\draw[->, thick, dashed] ([xshift=1.5cm]boot.east) to[bend left=35] node[right, font=\scriptsize, align=left] {bootloader\\jumps here\\to run the\\application} ([xshift=1.5cm]app.east);
+\draw[->, thick] ([xshift=-1.0cm]boot.south west) -- (boot.south west);
+\node[anchor=south east, font=\scriptsize, align=right] at ([xshift=-1.0cm]boot.south west) {hardware\\fetches SP\\and reset\\vector here,\\always};
+\draw[->, thick, dashed] (boot.east) -- ([xshift=1.5cm]boot.east) |- (app.south east);
+\node[right, font=\scriptsize, align=left] at ([xshift=1.5cm,yshift=0.25cm]boot.east) {bootloader\\jumps here\\to run the\\application};
 \end{tikzpicture}
 \end{center}}
 

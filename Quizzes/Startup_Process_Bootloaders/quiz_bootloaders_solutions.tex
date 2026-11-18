@@ -29,8 +29,10 @@
 \begin{tikzpicture}[region/.style={draw, align=center, font=\small, text width=4.4cm, inner sep=4pt}]
 \node[region, minimum height=1.6cm, fill=blue!5] (app) {Application\\[1pt] #2\\[1pt] own vector table at its base};
 \node[region, minimum height=1.0cm, fill=orange!10, below=0pt of app] (boot) {Bootloader\\[1pt] #1\\[1pt] own vector table at its base};
-\draw[->, thick] ([xshift=-0.9cm]boot.south west) ++(0,-0.05) -- node[left, font=\scriptsize, align=right] {hardware\\fetches SP\\and reset\\vector here,\\always} ([xshift=-0.9cm]boot.west);
-\draw[->, thick, dashed] ([xshift=1.4cm]boot.east) to[bend left=35] node[right, font=\scriptsize, align=left] {bootloader\\jumps here\\to run the\\application} ([xshift=1.4cm]app.east);
+\draw[->, thick] ([xshift=-0.9cm]boot.south west) -- (boot.south west);
+\node[anchor=south east, font=\scriptsize, align=right] at ([xshift=-0.9cm]boot.south west) {hardware\\fetches SP\\and reset\\vector here,\\always};
+\draw[->, thick, dashed] (boot.east) -- ([xshift=1.4cm]boot.east) |- (app.south east);
+\node[right, font=\scriptsize, align=left] at ([xshift=1.4cm,yshift=0.25cm]boot.east) {bootloader\\jumps here\\to run the\\application};
 \end{tikzpicture}
 \end{center}}
 
