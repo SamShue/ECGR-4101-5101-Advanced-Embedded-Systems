@@ -1,0 +1,488 @@
+% Homework: Real-Time Operating Systems.
+% Self-contained -- no Python data generation needed (the one diagram is
+% drawn directly with TikZ). Compile normally for the student copy, or with
+% \def\keymode{1} before \input (or -jobname + the pretex trick, same as the
+% other homeworks in this repo) to produce the instructor key.
+%
+% By design this homework stays away from any particular RTOS's API syntax
+% (no FreeRTOS, CMSIS-RTOS2, osThreadNew(), HAL_*, etc.). All pseudocode uses
+% generic, vendor-neutral function names. The goal is to build conceptual
+% understanding of why RTOSes exist and how they work: busy-waiting versus
+% cooperative versus preemptive scheduling, threads and context switching,
+% determinism, and synchronization primitives (queues, semaphores, mutexes,
+% and priority inversion).
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+
+\ifdefined\keymode
+  \newcommand{\keyans}[1]{\par\smallskip{\color{red}\small\textbf{Key:} #1}\par}
+  \newcommand{\docsuffix}{ -- Instructor Key}
+\else
+  \newcommand{\keyans}[1]{}
+  \newcommand{\docsuffix}{}
+\fi
+
+% Ruled blank space students can use to write their answer.
+\newcommand{\answerspace}[1]{\par\vspace{#1}\noindent\hrulefill\par\vspace{4pt}}
+
+\setlength{\parindent}{0pt}
+\setlist[enumerate]{leftmargin=*, itemsep=4pt, topsep=2pt}
+
+% Priority-inversion timeline used by Problem 5: TaskL acquires a shared
+% mutex, TaskH becomes ready and blocks waiting on that same mutex, and
+% TaskM (which never touches the mutex at all) preempts TaskL in the
+% meantime, delaying TaskH even though nothing of higher priority than
+% TaskH is actually running.
+\newcommand{\priorityInversionDiagram}{%
+\begin{center}
+\begin{tikzpicture}[x=1.55cm, y=0.95cm, >={Stealth[length=2mm]}]
+  \foreach \x in {0,1,2,3,4,5}
+    \draw[gray!35, dotted] (\x,0.2) -- (\x,3.9);
+  \draw[->] (0,0.2) -- (5.7,0.2) node[right, font=\footnotesize] {time};
+  \node[anchor=east, font=\small] at (-0.15,3) {TaskH (high)};
+  \node[anchor=east, font=\small] at (-0.15,2) {TaskM (medium)};
+  \node[anchor=east, font=\small] at (-0.15,1) {TaskL (low)};
+  % TaskL runs and acquires the shared mutex at t0.
+  \draw[line width=5pt, orange] (0,1) -- (1,1);
+  % TaskH becomes ready at t1 but cannot run: it blocks waiting on the
+  % mutex that TaskL is holding, all the way until t4.
+  \draw[line width=5pt, red!35] (1,3) -- (4,3);
+  % TaskM becomes ready at t1 as well and, having higher priority than
+  % TaskL (and no interest in the mutex at all), preempts TaskL immediately.
+  \draw[line width=5pt, blue] (1,2) -- (3,2);
+  % TaskL only resumes once TaskM is done, then finishes its critical
+  % section and releases the mutex at t4.
+  \draw[line width=5pt, orange] (3,1) -- (4,1);
+  % Only now can TaskH finally acquire the mutex and run.
+  \draw[line width=5pt, red] (4,3) -- (5.4,3);
+  \node[font=\scriptsize, align=center] at (0.9,3.5)
+    {t1: TaskH ready,\\blocks on mutex};
+  \node[font=\scriptsize, align=center] at (2,2.5)
+    {t1--t3: TaskM preempts\\TaskL (mutex still held)};
+  \node[font=\scriptsize, align=center] at (4.7,3.5)
+    {t4: mutex released,\\TaskH finally runs};
+\end{tikzpicture}
+\end{center}}
+
+\begin{document}
+
+{\Large\bfseries ECGR 4101/5101 -- Advanced Embedded Systems}\hfill
+Name: \underline{\hspace{5cm}}\quad Date: \underline{\hspace{2.5cm}}\\[2pt]
+{\large Homework: Real-Time Operating Systems\docsuffix}
+
+\smallskip
+This homework is about the concepts behind real-time operating systems, not
+the syntax of any particular one. You will \textbf{not} be asked to recall
+specific API function names, structs, or configuration macros from FreeRTOS,
+CMSIS-RTOS2, or any other RTOS. Any pseudocode below uses plain, made-up
+function names. Answer every question in your own words, in a sentence or
+two unless a question says otherwise, based on what we covered in class.
+
+\bigskip
+\textbf{Problem 1: From Busy-Waiting to a Scheduler}
+
+\smallskip
+Consider an embedded application controlling a small conveyor belt. Among
+other things, it needs to pulse a stepper motor forward once every
+500~ms to keep the belt moving, and it also needs to react as quickly as
+possible whenever an operator presses a momentary safety-stop button wired
+to a digital input pin. A first attempt at this is written as:
+
+\begin{verbatim}
+void motorStepTask(void) {
+  while (getTick() - lastStepTime < 500);   // busy-wait right here
+  stepMotorForward();
+  lastStepTime = getTick();
+}
+
+void stopButtonTask(void) {
+  if (stopButtonPressed())
+    haltMotor();
+}
+
+while (1) {
+  motorStepTask();
+  stopButtonTask();
+}
+\end{verbatim}
+
+\begin{enumerate}[label=(\alph*)]
+
+\item Explain why a quick press-and-release of the stop button is likely to
+  go completely undetected if it happens while \texttt{motorStepTask()} is
+  busy-waiting, even though \texttt{stopButtonTask()} is called again and
+  again inside the same \texttt{while(1)} loop.
+  \answerspace{1.8cm}
+  \keyans{While \texttt{motorStepTask()} is stuck in its busy-wait loop,
+    control never returns to the \texttt{while(1)} loop, so
+    \texttt{stopButtonTask()} cannot run at all for up to 500~ms at a time.
+    If the operator presses and releases the button entirely within that
+    window, the input pin has already returned to its unpressed level by
+    the time \texttt{stopButtonTask()} finally checks it, so the press is
+    never seen at all -- for a safety-related function like this, that is a
+    serious problem, not just an inconvenience.}
+
+\item Suppose \texttt{motorStepTask()} is rewritten so that it checks the
+  elapsed time and returns immediately if 500~ms have not yet passed,
+  stepping the motor and returning only once they have -- without ever
+  busy-waiting inside the function. What is this general style of
+  scheduling called, and what does it mean, conceptually, for a task to
+  ``cooperate'' with the rest of the system?
+  \answerspace{1.6cm}
+  \keyans{This is cooperative scheduling. ``Cooperating'' means each task is
+    written so that it voluntarily and quickly gives up the CPU (by
+    returning or otherwise yielding) rather than holding onto it, trusting
+    that the other tasks will do the same.}
+
+\item This rewritten \texttt{motorStepTask()} still needs a variable like
+  \texttt{lastStepTime} to remember the tick count from the last time it
+  ran. Explain why this value cannot simply be a local variable declared
+  inside \texttt{motorStepTask()}, and what this implies about what a
+  ``thread'' running under an RTOS needs to have of its own that a plain
+  function call does not.
+  \answerspace{1.8cm}
+  \keyans{A local variable's storage (the function's stack frame) is
+    destroyed the moment the function returns, so a local
+    \texttt{lastStepTime} would be reset to garbage every single call
+    instead of remembering the previous step time. A thread needs its own
+    persistent storage -- in particular, its own stack and saved execution
+    context -- that survives across the many separate ``turns'' it is
+    given, which is exactly what an RTOS sets up for each thread it
+    creates.}
+
+\item Now suppose the stop button is instead wired to trigger a hardware
+  interrupt the instant it is pressed, and the interrupt handler itself
+  halts the motor (rather than the main loop periodically asking ``has the
+  button been pressed?''). What general term describes this style of
+  handling the stop-button task compared to the cooperative version in part
+  (b), and why does it no longer matter how long \texttt{motorStepTask()}
+  takes between checks, or how brief the button press is?
+  \answerspace{1.8cm}
+  \keyans{This is preemptive scheduling/servicing: the button press itself
+    forcibly interrupts whatever is currently running, rather than waiting
+    for that code to voluntarily check whether the button is pressed.
+    Because the hardware guarantees the handler runs immediately on the
+    press, it no longer matters how long \texttt{motorStepTask()} takes
+    between checks, nor whether the press-and-release happens faster than
+    the main loop could have polled for it.}
+
+\item As an application grows to include many tasks with very different
+  timing requirements (some periodic, some triggered by external events,
+  some with strict deadlines), explain why hand-coding all of their
+  interactions inside one big \texttt{while(1)} loop -- even a carefully
+  cooperative one -- eventually becomes impractical. What part of an RTOS
+  exists specifically to take over this responsibility?
+  \answerspace{1.8cm}
+  \keyans{With only a handful of tasks it is feasible for a programmer to
+    reason about every possible ordering and timing interaction by hand,
+    but as the number of tasks grows, the number of possible interleavings
+    and worst-case delays grows far faster, making it increasingly
+    difficult (and eventually impossible in practice) to guarantee by
+    inspection that no task will miss a deadline or block another for too
+    long. The scheduler is the part of an RTOS that takes over the job of
+    deciding, at every moment, which ready task should run next.}
+
+\end{enumerate}
+
+\newpage
+\textbf{Problem 2: Threads, Context Switches, and Scheduling Policies}
+
+\begin{enumerate}[label=(\alph*)]
+
+\item In your own words, define what a ``thread'' is in the context of an
+  RTOS running on a single-core microcontroller.
+  \answerspace{1.4cm}
+  \keyans{A thread is an independent stream of execution -- conceptually,
+    just a function with its own associated state -- that the scheduler can
+    run, pause, and resume independently of any other thread, giving the
+    illusion that it executes concurrently with the rest of the
+    application.}
+
+\item A single CPU core can only execute instructions from one thread at
+  any given instant, yet several threads appear to make progress at the
+  same time. Explain the mechanism that creates this illusion, and name the
+  specific action the OS performs to stop running one thread and begin
+  running another.
+  \answerspace{1.6cm}
+  \keyans{The illusion is created by rapidly switching which thread's
+    instructions the CPU is executing, giving each one a short slice of
+    time so that, to an outside observer, all of them seem to progress at
+    once even though only one is ever truly running at a time. The specific
+    action that swaps the CPU from one thread's state to another's is
+    called a context switch.}
+
+\item During a context switch, the RTOS must save and later restore each
+  thread's execution state in memory dedicated to that specific thread.
+  List at least three distinct pieces of information that must be saved,
+  and explain why each thread needs its own separate block of memory to
+  hold this information rather than sharing one block among all threads.
+  \answerspace{1.8cm}
+  \keyans{At minimum, the CPU registers (including the program counter and
+    general-purpose registers), the thread's own stack pointer, and the
+    contents of that thread's own stack (its local variables and call
+    history) all need to be preserved. Each thread needs its own block of
+    memory because its registers and stack contents will, in general, be
+    completely different from every other thread's at the moment it gets
+    paused -- overwriting them with another thread's values (or sharing one
+    stack among threads) would destroy the paused thread's ability to
+    resume correctly later.}
+
+\item Describe, in your own words, the difference between round-robin
+  scheduling, cooperative scheduling, and preemptive priority-based
+  scheduling. For each one, state specifically what determines when a
+  currently running thread stops running and a different thread starts.
+  \answerspace{2.2cm}
+  \keyans{Round-robin: every ready thread is given an equal, fixed slice of
+    time in turn, and a thread stops running simply because its time slice
+    has expired, regardless of priority. Cooperative: a thread keeps
+    running until it voluntarily gives up the CPU (by blocking, finishing,
+    or explicitly yielding) -- the scheduler never forcibly interrupts it.
+    Preemptive priority-based: a running thread is forcibly stopped the
+    instant a higher-priority thread becomes ready to run, regardless of
+    whether the running thread was willing to give up the CPU or not.}
+
+\item Suppose a low-priority thread enters an infinite loop that never
+  calls any blocking function and never returns. Under a preemptive
+  scheduler, explain what hardware mechanism still allows a
+  higher-priority thread to get CPU time, and what would happen to the
+  rest of the system if that hardware mechanism did not exist.
+  \answerspace{1.8cm}
+  \keyans{A periodic hardware timer interrupt (separate from anything the
+    misbehaving thread does) forces control away from the currently
+    running thread at a fixed interval, giving the scheduler a chance to
+    run and switch to a higher-priority ready thread. Without this
+    mechanism, a thread that never voluntarily returns control would run
+    forever, permanently starving every other thread in the system -- no
+    higher-priority thread, no matter how urgent, would ever get to run
+    again.}
+
+\item Every RTOS includes a special, built-in ``idle'' thread that is
+  always ready to run and is assigned the lowest possible priority.
+  Explain why an OS needs a thread like this instead of simply leaving the
+  CPU with nothing scheduled whenever every other thread is blocked or
+  suspended.
+  \answerspace{1.6cm}
+  \keyans{The scheduler always needs some thread to hand the CPU to; if
+    every application thread happens to be blocked or suspended at the same
+    moment, there still has to be something for the processor to execute.
+    The idle thread exists purely to fill this need (and is commonly also
+    used to perform low-priority housekeeping, such as freeing resources
+    of deleted threads) whenever no other thread is ready.}
+
+\end{enumerate}
+
+\newpage
+\textbf{Problem 3: Real-Time Behavior and Determinism}
+
+\begin{enumerate}[label=(\alph*)]
+
+\item Explain what specifically distinguishes a ``real-time'' operating
+  system from a general-purpose operating system, in terms of what
+  guarantee it must provide and over what kind of time scale that
+  guarantee is expected to hold.
+  \answerspace{1.6cm}
+  \keyans{A real-time OS must guarantee that certain operations complete
+    within a specified time constraint, called a deadline, which is
+    typically on the order of milliseconds or even microseconds. A
+    general-purpose OS has no such guarantee -- it may respond quickly most
+    of the time, but nothing in its design promises an upper bound on how
+    long a response might take.}
+
+\item Desktop operating systems rely heavily on virtual memory, paging, and
+  swapping data out to disk. Explain, in your own words, why page faults
+  and disk-based swapping are fundamentally difficult to reconcile with
+  meeting a hard real-time deadline, even though this behavior works
+  perfectly well for everyday desktop applications.
+  \answerspace{1.8cm}
+  \keyans{Servicing a page fault means pausing the running program,
+    locating the needed data (possibly on a disk), and loading it back into
+    RAM before execution can continue -- and the amount of time this takes
+    is not fixed; it depends on where the data physically lives and on
+    whatever else the storage device happens to be doing at that moment.
+    A system that cannot guarantee how long this pause will last cannot
+    guarantee that any deadline will be met, which is why real-time systems
+    generally avoid paging and swapping even though ordinary desktop use
+    rarely notices the resulting delay.}
+
+\item Explain why a thread's priority (used by the scheduler to decide
+  which ready thread runs next) is a fundamentally different concept from
+  the priority assigned to a hardware interrupt, and give an example of a
+  situation where this distinction actually matters -- that is, a moment
+  when a high-priority thread is ready to run but is not actually the thing
+  executing on the CPU.
+  \answerspace{1.8cm}
+  \keyans{Thread priority only governs competition among threads for the
+    CPU once an interrupt has finished and the scheduler is choosing which
+    thread to resume; it says nothing about what happens while an interrupt
+    service routine itself is executing. For example, while any interrupt
+    service routine is running (even one unrelated to a given high-priority
+    thread), that thread is formally ``ready'' and may even be the highest
+    priority ready thread in the whole system, yet it is still not the
+    thing actually executing on the CPU until the ISR finishes and the
+    scheduler runs.}
+
+\end{enumerate}
+
+\newpage
+\textbf{Problem 4: Synchronization with Queues and Semaphores}
+
+\smallskip
+Suppose one thread continually produces data (for example, samples read
+from a sensor) and a second thread continually consumes that data (for
+example, computing a running average) by sharing a common buffer between
+them.
+
+\begin{enumerate}[label=(\alph*)]
+
+\item Describe, in your own words, the two mistakes that must both be
+  avoided for this producer/consumer arrangement to work correctly: one
+  mistake the producer could make, and one mistake the consumer could
+  make.
+  \answerspace{1.6cm}
+  \keyans{The producer must not keep writing new data into the buffer once
+    it is completely full (overwriting data the consumer has not yet
+    read). The consumer must not try to read data out of the buffer once
+    it is completely empty (reading stale or meaningless data that was
+    never actually produced).}
+
+\item Explain how a message queue, as provided by an RTOS, prevents both
+  of those mistakes automatically, including what specifically happens to
+  a thread that tries to add an item to a full queue, or to a thread that
+  tries to remove an item from an empty queue.
+  \answerspace{1.8cm}
+  \keyans{A message queue keeps track of how many items it currently holds
+    and enforces its fixed capacity. A thread that tries to add an item
+    to a full queue is placed in the blocked state until at least one item
+    is removed by some other thread, and likewise a thread that tries to
+    remove an item from an empty queue is placed in the blocked state until
+    some other thread adds a new item -- in both cases the OS kernel
+    automatically pauses the offending thread rather than letting it
+    proceed incorrectly.}
+
+\item A semaphore can conceptually be thought of as nothing more than a
+  variable (a boolean flag, or a counter) that threads check before
+  proceeding. Explain why a plain, unprotected global variable cannot
+  safely serve as a semaphore in a multithreaded system, and what role the
+  OS kernel has to play in order to make this safe.
+  \answerspace{1.8cm}
+  \keyans{There is no guarantee that checking a variable's value and then
+    updating it happens as a single, uninterruptible step; a thread could
+    be preempted in between checking and updating the variable, allowing
+    another thread to also ``succeed'' at the same check before the first
+    thread finishes updating it, letting two threads believe they both
+    safely acquired the same resource. The OS kernel must perform the
+    check-and-update as an atomic operation (for example, by disabling
+    interrupts or otherwise preventing a context switch during that brief
+    step) so that only one thread can ever succeed at acquiring the
+    semaphore at a time.}
+
+\item Explain the conceptual difference between a binary semaphore and a
+  counting semaphore. Then describe one resource-sharing scenario of your
+  own (not one used in this course) where a counting semaphore with an
+  initial count greater than one would be the appropriate choice.
+  \answerspace{1.8cm}
+  \keyans{A binary semaphore can only be in one of two states (taken or
+    available), so it is suited to situations where exactly one thread may
+    hold the resource at a time. A counting semaphore starts with some
+    initial count greater than one and is decremented every time it is
+    acquired and incremented every time it is released, so up to that many
+    threads may hold instances of the resource simultaneously, and a
+    thread only blocks once the count reaches zero. Any reasonable example
+    is acceptable, e.g., a pool of several identical hardware DMA channels,
+    a fixed number of reusable network connection buffers, or a small pool
+    of identical sensor-reading structures, where a counting semaphore
+    initialized to the number of available resources in the pool lets that
+    many threads proceed at once.}
+
+\end{enumerate}
+
+\newpage
+\textbf{Problem 5: Mutexes and Priority Inversion}
+
+\smallskip
+The timeline below shows three threads of different priority:
+\texttt{TaskH} (high priority), \texttt{TaskM} (medium priority), and
+\texttt{TaskL} (low priority). \texttt{TaskL} and \texttt{TaskH} both need
+to access the same shared resource and therefore both acquire the same
+mutex before using it; \texttt{TaskM} never touches that resource or that
+mutex at all.
+
+\priorityInversionDiagram
+
+\begin{enumerate}[label=(\alph*)]
+
+\item Using the diagram, describe in your own words the sequence of events
+  that causes the high-priority \texttt{TaskH} to sit blocked for so long,
+  even though no thread with higher priority than \texttt{TaskH} is running
+  anywhere in the system during that time. This general problem is known
+  as priority inversion.
+  \answerspace{2cm}
+  \keyans{\texttt{TaskL} acquires the mutex first. Shortly after,
+    \texttt{TaskH} becomes ready and tries to acquire that same mutex, but
+    since \texttt{TaskL} is still holding it, \texttt{TaskH} must block and
+    wait. Meanwhile, \texttt{TaskM} becomes ready at around the same time
+    and, having higher priority than \texttt{TaskL} (and no interest in the
+    mutex at all), immediately preempts \texttt{TaskL} and runs to
+    completion. Only once \texttt{TaskM} finishes does \texttt{TaskL}
+    resume, finish its critical section, and finally release the mutex --
+    at which point \texttt{TaskH} can finally acquire it and run. The net
+    effect is that the medium-priority \texttt{TaskM}, despite never
+    touching the shared resource, has effectively delayed the
+    highest-priority thread in the system.}
+
+\item Explain the conceptual difference between a mutex and a semaphore in
+  terms of ownership: who is expected to acquire and release each one.
+  \answerspace{1.6cm}
+  \keyans{A mutex is meant to always be acquired and later released by that
+    same thread, since it exists purely to protect a shared resource during
+    the period that one specific thread is using it. A semaphore has no
+    such ownership expectation -- it is entirely normal, and often by
+    design, for one thread (or even an interrupt handler) to release a
+    semaphore that a completely different thread later acquires, since
+    semaphores are also used to signal that some event has occurred rather
+    than only to protect a resource.}
+
+\item Describe the general strategy (sometimes called priority
+  inheritance) that many RTOSes use to minimize priority inversion.
+  Explain, specifically, how temporarily changing the priority of one of
+  the three threads in the diagram above would have prevented
+  \texttt{TaskM} from delaying \texttt{TaskL} (and therefore
+  \texttt{TaskH}) for as long as it did.
+  \answerspace{2cm}
+  \keyans{When a higher-priority thread is found to be blocked waiting on a
+    mutex that a lower-priority thread currently holds, the OS temporarily
+    raises the priority of the mutex-holding thread to match the priority
+    of the thread waiting on it. In the diagram, this means that as soon
+    as \texttt{TaskH} blocks waiting on the mutex held by \texttt{TaskL},
+    \texttt{TaskL}'s priority would be temporarily raised to \texttt{TaskH}'s
+    level. \texttt{TaskM} would then no longer be able to preempt
+    \texttt{TaskL}, since \texttt{TaskL} now effectively outranks it, so
+    \texttt{TaskL} would finish its critical section and release the mutex
+    much sooner, letting \texttt{TaskH} run far earlier -- and only after
+    the mutex is released would \texttt{TaskL}'s priority drop back down,
+    finally allowing \texttt{TaskM} to run.}
+
+\item Suppose priority inheritance were not implemented at all in this
+  example. Explain, in the worst case, how additional medium-priority
+  threads could prevent the high-priority \texttt{TaskH} from running for
+  an arbitrarily long, essentially unbounded amount of time -- a phenomenon
+  sometimes called unbounded priority inversion.
+  \answerspace{1.8cm}
+  \keyans{Without priority inheritance, \texttt{TaskL}'s priority never
+    changes while it holds the mutex, so it remains just as vulnerable to
+    being preempted by any medium-priority thread as it was before
+    acquiring the mutex. If new medium-priority threads keep becoming ready
+    one after another, each one will preempt \texttt{TaskL} in turn before
+    it can finish its critical section and release the mutex, and
+    \texttt{TaskH} remains blocked the entire time. Since there is no limit
+    on how many such medium-priority threads could keep arriving, there is
+    also no bound on how long \texttt{TaskH} -- the highest-priority thread
+    in the system -- could be forced to wait.}
+
+\end{enumerate}
+
+\end{document}
