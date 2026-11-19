@@ -2,9 +2,10 @@
 """
 Build the "Decoding a USB Packet" in-class activity.
 
-Uses USB_Frame_Generator.py from ../Serial_Waveform_Generation to create the
-waveform, then writes the figure and the answer data that usb_activity.tex
-needs, and compiles a student handout and an instructor key with pdflatex.
+Uses USB_Frame_Generator.py from ../../Serial_Waveform_Generation to create
+the waveform, then writes the figure and the answer data that
+usb_activity.tex needs, and compiles a student handout and an instructor
+key with pdflatex.
 
 Everything is written to ./build (waveform PNG, generated .tex fragments,
 usb_activity_student.pdf and usb_activity_key.pdf).
@@ -27,7 +28,7 @@ BUILD = HERE / "build"
 TEX_FILE = "usb_activity.tex"
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(HERE.parent / "Serial_Waveform_Generation"))
+sys.path.insert(0, str(HERE.parent.parent / "Serial_Waveform_Generation"))
 import USB_Frame_Generator as usb  # noqa: E402
 
 NUM_RANDOM_BYTES = 1
